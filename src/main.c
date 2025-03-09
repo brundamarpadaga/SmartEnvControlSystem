@@ -5,7 +5,7 @@
  *          reads temperature, pressure, and humidity, and prints them over UART.
  *
  * Course:  ECE 544 - Embedded Systems Design, Winter 2025
- * Authors: Nikolay Nikolov, Ashten Bontrager
+ * Authors:
  */
 
 #include "FreeRTOS.h"
@@ -16,6 +16,7 @@
 #include "task.h"
 #include "xiic.h"
 #include "xil_printf.h"
+#include <stdlib.h>
 
 /* BME280 I2C address */
 #define BME280_I2C_ADDR 0x76
@@ -178,7 +179,7 @@ void bme280_task(void* pvParameters)
                 /* Manual formatting for xil_printf (no %f support) */
                 xil_printf("Temp: %d.%02d C, Press: %u.%02u hPa, Hum: %u.%02u%%\r\n",
                            temp / 100,
-                           abs(temp % 100), /* Temp in °C */
+                           abs(temp % 100), /* Temp in Â°C */
                            press / 100,
                            press % 100, /* Pressure in hPa */
                            hum / 1024,
