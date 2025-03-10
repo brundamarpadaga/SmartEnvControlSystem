@@ -1,57 +1,66 @@
-
-
 #ifndef MAIN_H
 #define MAIN_H
 
-/* Standard C library includes. */
+/*
+ * main.h - Header file for TSL2561 and BME280-based PID control system with OLED display
+ *
+ * Purpose: Defines constants, global variables, and function prototypes for the
+ *          FreeRTOS-based environmental control system. This includes hardware interfaces
+ *          (GPIO, I2C, NX4IO), sensor drivers (TSL2561, BME280), PID control, and OLED display
+ *          functionality for dynamic sensor data visualization. BME280-specific structures
+ *          and functions are defined in bme280.h to avoid redefinition.
+ *
+ * Course:  ECE 544 - Embedded Systems Design, Winter 2025
+ * Final Project - Environmental Control System
+ */
+
+/* Standard C library includes */
+#include <stdint.h>
 #include <stdlib.h>
 
-/* Xilinx BSP and platform includes. */
+/* Xilinx BSP and platform includes */
 #include "sleep.h"
 #include "xgpio.h"
-#include "xiic.h" // Xilinx I2C driver API for AXI IIC controller
+#include "xiic.h"
 #include "xil_printf.h"
 #include "xparameters.h"
 #include "xtmrctr.h"
-// #include "xintc.h" // Xilinx interrupt controller API for interrupt management
 
-/* FreeRTOS kernel includes. */
+/* FreeRTOS kernel includes */
 #include "FreeRTOS.h"
 #include "queue.h"
 #include "semphr.h"
 #include "task.h"
 #include "timers.h"
 
-/* Project-specific includes. */
-#include "bme280_driver.h"
-#include "i2c.h" // I2C driver interface for AXI IIC controller
+/* Project-specific includes */
+#include "bme280.h"
 #include "nexys4IO.h"
+#include "oled.h"
 #include "pidtask.h"
 #include "platform.h"
 #include "tsl2561.h"
 
-/*Definitions for NEXYS4IO Peripheral*/
+/* Definitions for NEXYS4IO Peripheral */
 #define N4IO_DEVICE_ID XPAR_NEXYS4IO_0_DEVICE_ID
 #define N4IO_BASEADDR XPAR_NEXYS4IO_0_S00_AXI_BASEADDR
 #define N4IO_HIGHADDR XPAR_NEXYS4IO_0_S00_AXI_HIGHADDR
 #define I2C_BASE_ADDR XPAR_AXI_IIC_0_BASEADDR
 #define I2C_DEV_ID_ADDR XPAR_AXI_IIC_0_DEVICE_ID
 
+/* GPIO channel definitions */
 #define BTN_CHANNEL 1
 #define SW_CHANNEL 2
 
-#define mainQUEUE_LENGTH (1)
+/* Queue and timing definitions */
+#define mainQUEUE_LENGTH 1
+#define mainDONT_BLOCK (TickType_t) 0
 
-/* A block time of 0 simply means, "don't block". */
-#define mainDONT_BLOCK (portTickType) 0
+/* PID control definitions */
+#define max_duty 255
+#define min_duty 0
+#define lux_mask 0xFFFF
 
-/********** Duty Cycle Related Constants **********/
-#define max_duty 255 // max possible duty cycle for RGB1 Blue
-#define min_duty 0   // min possible duty cycle for RGB1 Blue
-
-#define lux_mask 0xFFFF // mask used for combining setpoint and lux values into one double
-
-// macro for repeating code that checks for upper/lower saturation of setpoint and gains
 #define UPDATE_SATURATING(val, inc, min_val, max_val, increase)                                    \
     do                                                                                             \
     {                                                                                              \
@@ -71,31 +80,23 @@
         }                                                                                          \
     } while (0)
 
-// Create Instances
-static XGpio xInputGPIOInstance;
+/* Global Instances */
+extern XGpio             xInputGPIOInstance;
+extern XIic              IicInstance;
+extern SemaphoreHandle_t binary_sem;
+extern xQueueHandle      toPID;
+extern xQueueHandle      fromPID;
 
-// Declare a Semaphore
-xSemaphoreHandle  binary_sem;
-struct bme280_dev bme280;
-
-/* Interrupt-related globals (to be defined in tsl2561.c) */
-XIic IicInstance; // I2C instance
-// XIntc Intc; // Shared interrupt controller instance, defined in main.c
-
-/* The queue used to transfer buttons/switches from the input task to PID task. */
-static xQueueHandle toPID = NULL;
-
-/* The queue used to transfer setpoint and lux from PID to display task. */
-static xQueueHandle fromPID = NULL;
-
-// Function Declarations
-static void prvSetupHardware(void);
+/* Function Declarations */
+void        prvSetupHardware(void); /* Removed static */
 static void gpio_intr(void* pvUnused);
-
-// A task which takes the Interrupt Semaphore and sends the btn/sw states to PID Task
-void Parse_Input_Task(void* p);
-void sensor_task(void* pvParameters);
-
-int do_init(void);
+int         do_init(void);
+void        Parse_Input_Task(void* p);
+void        PID_Task(void* p);
+void        OLED_Display_Task(void* p);
+void        BME280_Task(void* pvParameters);
+bool        pid_init(PID_t* pid);
+float       pid_funct(PID_t* pid, uint16_t lux_value, uint8_t switches);
+void        print_pid(PID_t* pid);
 
 #endif /* MAIN_H */
