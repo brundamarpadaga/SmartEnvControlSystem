@@ -1,49 +1,40 @@
-# Base style: Google provides a solid foundation for embedded C with sensible defaults
+---
+# Base style (closest match to common embedded C practices)
 BasedOnStyle: Google
 
-# Indentation: 4 spaces is a common standard in embedded C
+# Use 4 spaces for indentation, no tabs
 IndentWidth: 4
 UseTab: Never
 TabWidth: 4
 
-# Alignment: Maximize alignment for readability and consistency
-AlignAfterOpenBracket: Align # Align arguments after opening brackets
-AlignConsecutiveAssignments: true # Align consecutive assignments (e.g., a = 1; b = 2;)
-AlignConsecutiveDeclarations: true # Align consecutive declarations (e.g., int a; int b;)
-AlignOperands: Align # Align operands in expressions across lines
-AlignTrailingComments: true # Align trailing comments for visual clarity
+# Align as much as possible
+AlignAfterOpenBracket: Align
+AlignConsecutiveAssignments: true
+AlignConsecutiveDeclarations: true
+AlignOperands: true
+AlignTrailingComments: true
 
-# Spacing: Enhance readability with consistent spacing
-SpaceBeforeParens: ControlStatements # Space before parens only for control statements (if, for, etc.)
-SpaceInEmptyParentheses: false # No space in empty parentheses: int foo()
-SpacesInParentheses: false # No space inside parentheses: int foo(int x)
-SpacesInSquareBrackets: false # No space in square brackets: array[0]
-SpacesInContainerLiterals: false # No space in container literals: {1, 2, 3}
-SpaceAfterCStyleCast: true # Space after C-style casts: (int) x
-SpaceBeforeAssignmentOperators: true # Space before =: a = b
-SpaceBeforeRangeBasedForLoopColon: true # Space before : in range-based for: for (auto x : y)
-SpaceAroundPointerQualifiers: After # int* ptr (preferred in C over int *ptr)
+# Space inside brackets for readability
+SpaceBeforeParens: Always
+SpaceInEmptyParentheses: true
+SpacesInParentheses: true
+SpacesInSquareBrackets: true
+SpacesInContainerLiterals: true
+SpaceAfterCStyleCast: true
 
-# Line length and breaking: Balance readability and compactness
-ColumnLimit: 100 # Increase to 100 (80 is often too restrictive for embedded)
-BreakBeforeBraces: Allman # Allman style (braces on new lines) for clarity in embedded code
-AllowShortFunctionsOnASingleLine: InlineOnly # Allow only inline functions on one line
-ContinuationIndentWidth: 4 # Indent continuation lines by 4 spaces
+# Additional alignment and spacing tweaks
+ColumnLimit: 100
+BreakBeforeBraces: Allman # Each brace on a new line for clarity
+AllowShortFunctionsOnASingleLine: None # No single-line functions
+PointerAlignment: Left # int* ptr (not int *ptr)
+BinPackArguments: false # Don't pack arguments, align them
+BinPackParameters: false # Don't pack parameters, align them
 
-# Pointer and reference alignment: Consistency is key
-PointerAlignment: Left # int* ptr (common in embedded C, avoids confusion)
-ReferenceAlignment: Left # int& ref (consistent with pointer alignment)
+# Align comments (removed invalid MinCommentAlignment)
+CommentPragmas: "^ IWYU pragma:"
 
-# Packing: Avoid packing for better readability
-BinPackArguments: false # Don't pack function arguments, keep them on separate lines if needed
-BinPackParameters: false # Don't pack function parameters
-
-# Comments: Preserve intent and readability
-CommentPragmas: "^ IWYU pragma:" # Recognize IWYU pragmas for include-what-you-use
-ReflowComments: true # Reflow comments to fit within ColumnLimit
-MaxEmptyLinesToKeep: 1 # Keep at most 1 empty line for cleaner code
-
-# Miscellaneous: Embedded-specific tweaks
-AllowShortIfStatementsOnASingleLine: Never # Avoid single-line ifs for clarity in control flow
-IndentCaseLabels: true # Indent case labels in switch statements
-SortIncludes: true # Sort #include directives alphabetically
+# Ensure consistent spacing around operators
+SpaceBeforeAssignmentOperators: true
+SpaceBeforeRangeBasedForLoopColon: true
+SpaceAroundPointerQualifiers: After # int* not int *
+---

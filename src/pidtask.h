@@ -7,7 +7,7 @@
  *
  *
  * Course:  ECE 544 - Embedded Systems Design, Winter 2025
- * Authors:
+ * Authors: Nikolay Nikolov, Ashten Bontrager
  */
 
 #include "stdint.h"
@@ -29,12 +29,12 @@ typedef struct
 
 // prototype for function that initializes PID structure
 // returns byte used for checking if init has happened or not
-bool pid_init(PID_t* pid);
+bool pid_init ( PID_t* pid );
 
 // prototype of pid function that returns the controlled signal as a float
 // takes lux_value, returned from TSL2561 sensor returns float vlaue
 // is used to determine what value to write for LED PWM
-float pid_funct(PID_t* pid, uint16_t lux_value, uint8_t switches);
+float pid_funct ( PID_t* pid, uint16_t lux_value, uint8_t switches );
 
 /*********************PID Task Prototype*************************************
  *   Task Handles the Following:
@@ -48,11 +48,11 @@ float pid_funct(PID_t* pid, uint16_t lux_value, uint8_t switches);
  *   write to display thread MsgQ to update
  *   setpoint and current lux
  *****************************************************************************/
-void PID_Task(void* p);
+void PID_Task ( void* p );
 
 /************************Display Task****************************************
  *   Gets lux and setpoint values from Q and updates 7-seg display
  *****************************************************************************/
-void Display_Task(void* p);
+void Display_Task ( void* p );
 
-void print_pid(PID_t* pid);
+void print_pid ( PID_t* pid );

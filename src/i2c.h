@@ -11,7 +11,7 @@
  *          within a FreeRTOS environment on a Microblaze system.
  *
  * Course:  ECE 544 - Embedded Systems Design, Winter 2025
- * Authors:
+ * Authors: Nikolay Nikolov, Ashten Bontrager
  */
 
 /* BSP includes - Necessary Xilinx BSP headers for hardware interaction */
@@ -54,7 +54,7 @@ extern XIntc Intc;              // Shared interrupt controller instance, defined
  *
  * @return XST_SUCCESS if initialization succeeds, XST_FAILURE otherwise
  */
-int i2c_init(void);
+int i2c_init ( void );
 
 /**
  * Scans the I2C bus for devices from address 0x00 to 0x77.
@@ -63,7 +63,7 @@ int i2c_init(void);
  *
  * @param InstancePtr Pointer to the initialized XIic instance
  */
-void i2c_scan(XIic* InstancePtr);
+void i2c_scan ( XIic* InstancePtr );
 
 /**
  * Reads and displays the I2C Control Register (CR) contents.
@@ -71,7 +71,7 @@ void i2c_scan(XIic* InstancePtr);
  *
  * @param InstancePtr Pointer to the initialized XIic instance
  */
-void i2c_read_control(XIic* InstancePtr);
+void i2c_read_control ( XIic* InstancePtr );
 
 /**
  * Reads and displays the I2C Status Register (SR) contents.
@@ -80,7 +80,7 @@ void i2c_read_control(XIic* InstancePtr);
  *
  * @param InstancePtr Pointer to the initialized XIic instance
  */
-void i2c_read_status(XIic* InstancePtr);
+void i2c_read_status ( XIic* InstancePtr );
 
 /**
  * Performs a soft reset of the I2C peripheral.
@@ -89,6 +89,6 @@ void i2c_read_status(XIic* InstancePtr);
  * @param InstancePtr Pointer to the initialized XIic instance
  * @return XST_SUCCESS if reset succeeds, XST_FAILURE if bus remains busy
  */
-int i2c_soft_reset(XIic* InstancePtr);
+int i2c_soft_reset ( XIic* InstancePtr );
 
 #endif /* I2C_H */

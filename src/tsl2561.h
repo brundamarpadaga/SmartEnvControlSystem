@@ -11,7 +11,7 @@
  *          the Nexys A7 with Microblaze.
  *
  * Course:  ECE 544 - Embedded Systems Design, Winter 2025
- * Authors:
+ * Authors: Nikolay Nikolov, Ashten Bontrager
  */
 
 /* FreeRTOS includes - Core FreeRTOS headers for real-time functionality */
@@ -79,7 +79,7 @@ typedef enum
  * @param i2c Pointer to the initialized XIic instance
  * @return XST_SUCCESS if initialization succeeds, XST_FAILURE otherwise
  */
-int tsl2561_init(XIic* i2c);
+int tsl2561_init ( XIic* i2c );
 
 /**
  * Reads a channel (CH0 or CH1) from the TSL2561 sensor.
@@ -90,7 +90,7 @@ int tsl2561_init(XIic* i2c);
  * @param channel Channel to read (TSL2561_CHANNEL_0 or TSL2561_CHANNEL_1)
  * @return 16-bit channel value on success, 0 on failure
  */
-float tsl2561_readChannel(XIic* i2c, tsl2561_channel_t channel);
+float tsl2561_readChannel ( XIic* i2c, tsl2561_channel_t channel );
 
 /**
  * Calculates lux value from CH0 and CH1 readings (optional).
@@ -101,6 +101,6 @@ float tsl2561_readChannel(XIic* i2c, tsl2561_channel_t channel);
  * @param ch1 Channel 1 value (IR only)
  * @return Lux value as a float
  */
-float tsl2561_calculateLux(uint16_t ch0, uint16_t ch1);
+float tsl2561_calculateLux ( uint16_t ch0, uint16_t ch1 );
 
 #endif /* TSL2561_H */
