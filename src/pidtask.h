@@ -7,7 +7,7 @@
  *
  *
  * Course:  ECE 544 - Embedded Systems Design, Winter 2025
- *
+ * Authors: Nikolay Nikolov, Ashten Bontrager
  */
 
 #include "stdint.h"
@@ -16,15 +16,15 @@
 /* PID structure definition */
 typedef struct
 {
-    float    Kp;         // proportional gain
-    float    Ki;         // integral gain
-    float    Kd;         // derivative gain
-    uint16_t setpoint;   // intensity setpoint
-    float    integral;   // error acccumulator, sum of errors over time
-    float    prev_error; // previous error, used for (d_error/dt)
-    float    delta_t;    // change in time for derivative
-    uint16_t max_lim;    // value to set upper rail for output
-    uint8_t  min_lim;    // value to set lower rail for output
+    float    Kp;          // proportional gain
+    float    Ki;          // integral gain
+    float    Kd;          // derivative gain
+    uint16_t setpoint;    // intensity setpoint
+    float    integral;    // error acccumulator, sum of errors over time
+    float    prev_error;  // previous error, used for (d_error/dt)
+    float    delta_t;     // change in time for derivative
+    uint16_t max_lim;     // value to set upper rail for output
+    uint8_t  min_lim;     // value to set lower rail for output
 } PID_t;
 
 // prototype for function that initializes PID structure

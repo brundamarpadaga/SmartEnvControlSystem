@@ -1,6 +1,6 @@
 ---
 # Base style (closest match to common embedded C practices)
-BasedOnStyle: Microsoft
+BasedOnStyle: Google
 
 # Use 4 spaces for indentation, no tabs
 IndentWidth: 4
