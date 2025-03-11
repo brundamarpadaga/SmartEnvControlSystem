@@ -1,105 +1,232 @@
-
-#ifndef TSL2561_H
+#ifndef TSL2561_H // Include guard to prevent multiple inclusions
 #define TSL2561_H
 
 /*
  * tsl2561.h - Header file for TSL2561 luminosity sensor driver
  *
  * Purpose: Defines constants, types, and function prototypes for initializing
- *          and reading the TSL2561 sensor over I2C in polling mode. Provides
- *          support for luminance measurement in a FreeRTOS-based system on
- *          the Nexys A7 with Microblaze.
+ *          and reading the TSL2561 ambient light sensor over I2C in polling mode.
+ *          Provides support for luminance measurement in a FreeRTOS-based system
+ *          on the Nexys A7 with a Microblaze processor, targeting broadband and
+ *          infrared light readings.
  *
  * Course:  ECE 544 - Embedded Systems Design, Winter 2025
- * Authors: Nikolay Nikolov, Ashten Bontrager
+ *
+ * Dependencies: Relies on Xilinx BSP headers for I2C and timing, FreeRTOS headers
+ *               for real-time functionality, and standard C types for portability.
  */
 
-/* FreeRTOS includes - Core FreeRTOS headers for real-time functionality */
-#include "FreeRTOS.h"  // Main FreeRTOS kernel definitions and types (e.g., TickType_t)
-#include "semphr.h"  // Semaphore APIs for synchronization (unused here but included for potential future use)
-#include "task.h"  // Task management APIs (e.g., vTaskDelay)
+/*--------------------------------------------------------------------------*/
+/* FreeRTOS Includes - Core FreeRTOS headers for real-time functionality    */
+/*--------------------------------------------------------------------------*/
+#include "FreeRTOS.h" // Main FreeRTOS kernel definitions (e.g., TickType_t, pdMS_TO_TICKS)
+#include "semphr.h"   // Semaphore APIs for synchronization (e.g., SemaphoreHandle_t)
+#include "task.h"     // Task management APIs (e.g., vTaskDelay for timing control)
 
-/* BSP includes - Xilinx BSP headers for hardware interaction */
-#include "sleep.h"       // Provides usleep() for timing delays in sensor operations
-#include "xiic.h"        // Xilinx I2C driver API for AXI IIC controller communication
-#include "xil_printf.h"  // Xilinx printf implementation for debug output
+/*--------------------------------------------------------------------------*/
+/* BSP Includes - Xilinx BSP headers for hardware interaction              */
+/*--------------------------------------------------------------------------*/
+#include "sleep.h"      // Provides usleep() for microsecond delays during sensor operations
+#include "xiic.h"       // Xilinx I2C driver API for AXI IIC controller communication with TSL2561
+#include "xil_printf.h" // Lightweight printf implementation for debug and error output
 
-/* Standard includes - General-purpose C library types */
-#include <stdint.h>  // Provides fixed-width integer types (e.g., uint16_t)
+/*--------------------------------------------------------------------------*/
+/* Standard Includes - General-purpose C library types                     */
+/*--------------------------------------------------------------------------*/
+#include <stdint.h> // Fixed-width integer types (e.g., uint16_t for sensor data)
 
-/* TSL2561 device address - I2C slave address for the sensor */
-#define TSL2561_ADDR 0x39  // Default I2C address (ADDR pin floating, 7-bit address)
-
-/* Register addresses (base values) - Raw register offsets without command bit
+/*--------------------------------------------------------------------------*/
+/* TSL2561 Device Address                                                  */
+/*--------------------------------------------------------------------------*/
+/**
+ * @def TSL2561_ADDR
+ * @brief Default 7-bit I2C slave address of the TSL2561 sensor (0x39).
+ *        Set when the ADDR pin is floating; alternatives are 0x29 (ADDR low) or
+ *        0x49 (ADDR high).
  */
-#define CONTROL_REG 0x00    // Control register for power and operation control
-#define TIMING_REG 0x01     // Timing register for integration time and gain settings
-#define ID_REG 0x0A         // ID register for device identification
-#define DATA0LOW_REG 0x0C   // Channel 0 low byte (Visible + IR)
-#define DATA0HIGH_REG 0x0D  // Channel 0 high byte (Visible + IR)
-#define DATA1LOW_REG 0x0E   // Channel 1 low byte (IR only)
-#define DATA1HIGH_REG 0x0F  // Channel 1 high byte (IR only)
+#define TSL2561_ADDR 0x39
 
-/* Command bytes - Register addresses with command bit (0x80) set for I2C
- * transactions */
-#define TSL2561_CMD_CONTROL 0x80  // Command byte for Control register (0x00 | 0x80)
-#define TSL2561_CMD_TIMING 0x81   // Command byte for Timing register (0x01 | 0x80)
-#define TSL2561_CMD_INTERRUPT \
-    0x86                        // Command byte for Interrupt register (0x06 | 0x80, unused here)
-#define TSL2561_CMD_DATA0 0x8C  // Command byte for Data0 low byte (0x0C | 0x80)
-#define TSL2561_CMD_DATA1 0x8E  // Command byte for Data1 low byte (0x0E | 0x80)
+/*--------------------------------------------------------------------------*/
+/* Register Addresses (Base Values) - Raw offsets without command bit      */
+/*--------------------------------------------------------------------------*/
+/**
+ * @def CONTROL_REG
+ * @brief Base address of the Control register (0x00).
+ *        Used to power the sensor on/off.
+ */
+#define CONTROL_REG 0x00
 
-/* Register values - Predefined values for configuring TSL2561 registers */
-#define TSL2561_POWER_ON 0x03          // Power-on value for Control register (active mode)
-#define TSL2561_POWER_OFF 0x00         // Power-off value for Control register (inactive mode)
-#define TSL2561_TIMING_402MS_16X 0x02  // Timing register value: 402ms integration time, 16x gain
-#define TSL2561_INT_DISABLE 0x00       // Interrupt register value: Disable interrupts (unused here)
+/**
+ * @def TIMING_REG
+ * @brief Base address of the Timing register (0x01).
+ *        Configures integration time and gain settings.
+ */
+#define TIMING_REG 0x01
 
-/* Timeout for I2C operations - Maximum cycles to wait for bus idle */
-#define TIMEOUT_COUNTER \
-    1000000  // Timeout counter for I2C busy checks, adjustable based on system
-             // clock
+/**
+ * @def ID_REG
+ * @brief Base address of the ID register (0x0A).
+ *        Contains device identification (not used in this implementation).
+ */
+#define ID_REG 0x0A
 
-/* Enum for TSL2561 channels - Defines the two sensor channels for readability
+/**
+ * @def DATA0LOW_REG
+ * @brief Base address of Channel 0 low byte register (0x0C).
+ *        Stores the lower 8 bits of broadband (Visible + IR) light data.
+ */
+#define DATA0LOW_REG 0x0C
+
+/**
+ * @def DATA0HIGH_REG
+ * @brief Base address of Channel 0 high byte register (0x0D).
+ *        Stores the upper 8 bits of broadband (Visible + IR) light data.
+ */
+#define DATA0HIGH_REG 0x0D
+
+/**
+ * @def DATA1LOW_REG
+ * @brief Base address of Channel 1 low byte register (0x0E).
+ *        Stores the lower 8 bits of infrared-only light data.
+ */
+#define DATA1LOW_REG 0x0E
+
+/**
+ * @def DATA1HIGH_REG
+ * @brief Base address of Channel 1 high byte register (0x0F).
+ *        Stores the upper 8 bits of infrared-only light data.
+ */
+#define DATA1HIGH_REG 0x0F
+
+/*--------------------------------------------------------------------------*/
+/* Command Bytes - Register addresses with command bit (0x80) set          */
+/*--------------------------------------------------------------------------*/
+/**
+ * @def TSL2561_CMD_CONTROL
+ * @brief Command byte for the Control register (0x80 = 0x00 | 0x80).
+ *        Indicates a command transaction to the control register.
+ */
+#define TSL2561_CMD_CONTROL 0x80
+
+/**
+ * @def TSL2561_CMD_TIMING
+ * @brief Command byte for the Timing register (0x81 = 0x01 | 0x80).
+ *        Indicates a command transaction to set integration time and gain.
+ */
+#define TSL2561_CMD_TIMING 0x81
+
+/**
+ * @def TSL2561_CMD_INTERRUPT
+ * @brief Command byte for the Interrupt register (0x86 = 0x06 | 0x80).
+ *        Unused in this polling-based implementation.
+ */
+#define TSL2561_CMD_INTERRUPT 0x86
+
+/**
+ * @def TSL2561_CMD_DATA0
+ * @brief Command byte for Channel 0 low byte register (0x8C = 0x0C | 0x80).
+ *        Indicates a data read from Channel 0 (broadband).
+ */
+#define TSL2561_CMD_DATA0 0x8C
+
+/**
+ * @def TSL2561_CMD_DATA1
+ * @brief Command byte for Channel 1 low byte register (0x8E = 0x0E | 0x80).
+ *        Indicates a data read from Channel 1 (infrared).
+ */
+#define TSL2561_CMD_DATA1 0x8E
+
+/*--------------------------------------------------------------------------*/
+/* Register Values - Predefined configuration values                       */
+/*--------------------------------------------------------------------------*/
+/**
+ * @def TSL2561_POWER_ON
+ * @brief Value to power on the TSL2561 (0x03).
+ *        Sets the sensor to active mode in the Control register.
+ */
+#define TSL2561_POWER_ON 0x03
+
+/**
+ * @def TSL2561_POWER_OFF
+ * @brief Value to power off the TSL2561 (0x00).
+ *        Sets the sensor to inactive mode in the Control register.
+ */
+#define TSL2561_POWER_OFF 0x00
+
+/**
+ * @def TSL2561_TIMING_402MS_16X
+ * @brief Timing register value for 402ms integration time and 16x gain (0x02).
+ *        Configures the sensor for high sensitivity and longer integration.
+ */
+#define TSL2561_TIMING_402MS_16X 0x02
+
+/**
+ * @def TSL2561_INT_DISABLE
+ * @brief Value to disable interrupts in the Interrupt register (0x00).
+ *        Unused in this polling-based implementation.
+ */
+#define TSL2561_INT_DISABLE 0x00
+
+/*--------------------------------------------------------------------------*/
+/* Timeout Definition                                                      */
+/*--------------------------------------------------------------------------*/
+/**
+ * @def TIMEOUT_COUNTER
+ * @brief Maximum number of cycles to wait for I2C bus to become idle (1,000,000).
+ *        Adjustable based on system clock speed to prevent infinite loops.
+ */
+#define TIMEOUT_COUNTER 1000000
+
+/*--------------------------------------------------------------------------*/
+/* Enum Definitions                                                        */
+/*--------------------------------------------------------------------------*/
+/**
+ * @enum tsl2561_channel_t
+ * @brief Enumeration for TSL2561 sensor channels.
+ *
+ * Description: Defines the two available channels for readability and type safety.
  */
 typedef enum
 {
-    TSL2561_CHANNEL_0 = 0,  // Channel 0: Visible light + Infrared (broadband)
-    TSL2561_CHANNEL_1 = 1   // Channel 1: Infrared only
+    TSL2561_CHANNEL_0 = 0, // Channel 0: Broadband (Visible light + Infrared)
+    TSL2561_CHANNEL_1 = 1  // Channel 1: Infrared only
 } tsl2561_channel_t;
 
-/* Function prototypes - Declarations for TSL2561 driver functions implemented
- * in tsl2561.c */
-
+/*--------------------------------------------------------------------------*/
+/* Function Prototypes                                                     */
+/*--------------------------------------------------------------------------*/
 /**
- * Initializes the TSL2561 sensor over I2C.
- * Powers off the sensor, resets I2C, then configures power and timing settings
- * in polling mode.
- *
+ * @brief Initialize the TSL2561 sensor over I2C.
  * @param i2c Pointer to the initialized XIic instance
  * @return XST_SUCCESS if initialization succeeds, XST_FAILURE otherwise
+ *
+ * Description: Powers on the TSL2561, resets the I2C peripheral, and configures
+ *              the sensor with 402ms integration time and 16x gain in polling mode.
+ *              Ensures proper setup for subsequent readings.
  */
 int tsl2561_init ( XIic* i2c );
 
 /**
- * Reads a channel (CH0 or CH1) from the TSL2561 sensor.
- * Sends the register address and reads 2 bytes (low and high) to form a 16-bit
- * value.
- *
+ * @brief Read a channel (CH0 or CH1) from the TSL2561 sensor.
  * @param i2c Pointer to the initialized XIic instance
  * @param channel Channel to read (TSL2561_CHANNEL_0 or TSL2561_CHANNEL_1)
- * @return 16-bit channel value on success, 0 on failure
+ * @return Raw 16-bit channel value as a float on success, 0 on failure
+ *
+ * Description: Sends the appropriate register address and reads two bytes (low
+ *              and high) to form a 16-bit ADC value representing light intensity.
+ *              Returns 0 if I2C communication fails.
  */
 float tsl2561_readChannel ( XIic* i2c, tsl2561_channel_t channel );
 
 /**
- * Calculates lux value from CH0 and CH1 readings (optional).
- * Uses the TSL2561 datasheet formula to convert raw sensor data to lux (not
- * implemented yet).
- *
- * @param ch0 Channel 0 value (Visible + IR)
+ * @brief Calculate lux value from CH0 and CH1 readings (placeholder).
+ * @param ch0 Channel 0 value (Visible + IR, broadband)
  * @param ch1 Channel 1 value (IR only)
  * @return Lux value as a float
+ *
+ * Description: Intended to convert raw ADC values from both channels into a lux
+ *              measurement using the TSL2561 datasheet formula. Not implemented
+ *              in the current driver but included for future expansion.
  */
 float tsl2561_calculateLux ( uint16_t ch0, uint16_t ch1 );
 
