@@ -5,7 +5,7 @@
  *          over I2C, integrated with FreeRTOS for task-based updates.
  *
  * Course:  ECE 544 - Embedded Systems Design, Winter 2025
- * Authors: Nikolay Nikolov, Ashten Bontrager
+ * Authors:
  */
 
 #include "lcd.h"
@@ -106,6 +106,16 @@ int lcd_init ( XIic* i2c )
     oled_write_cmd ( i2c, 0xA6 );
 
     /* Clear the entire display */
+
+    clear_cld ( i2c );
+
+    oled_write_cmd ( i2c, 0xAF );  // Display ON
+    return XST_SUCCESS;
+}
+
+/* Clear the entire display */
+void clear_cld ( XIic* i2c )
+{
     uint8_t clear_buffer[ 32 ] = { 0 };
     for ( uint8_t page = 0; page < 8; page++ )
     {
@@ -117,9 +127,6 @@ int lcd_init ( XIic* i2c )
             oled_write_data ( i2c, clear_buffer, 32 );
         }
     }
-
-    oled_write_cmd ( i2c, 0xAF );  // Display ON
-    return XST_SUCCESS;
 }
 
 /* Display a string on the OLED at a specified page */
@@ -129,21 +136,6 @@ int lcd_display_string ( XIic* i2c, const char* str, uint8_t page )
 
     if ( xSemaphoreTake ( oled_sem, pdMS_TO_TICKS ( 100 ) ) == pdTRUE )
     {
-        /* Clear the two pages (16 pixels tall per character) */
-        uint8_t clear_buffer[ 32 ] = { 0 };
-        for ( uint8_t i = 0; i < 128; i += 32 )
-        {
-            oled_write_cmd ( i2c, 0xB0 + page );          // Set page
-            oled_write_cmd ( i2c, 0x00 + ( i & 0x0F ) );  // Column low
-            oled_write_cmd ( i2c, 0x10 + ( i >> 4 ) );    // Column high
-            oled_write_data ( i2c, clear_buffer, 32 );
-
-            oled_write_cmd ( i2c, 0xB0 + page + 1 );
-            oled_write_cmd ( i2c, 0x00 + ( i & 0x0F ) );
-            oled_write_cmd ( i2c, 0x10 + ( i >> 4 ) );
-            oled_write_data ( i2c, clear_buffer, 32 );
-        }
-
         /* Write the string */
         uint8_t col = 0;
         for ( uint32_t i = 0; str[ i ] != '\0' && col < 128; i++ )
@@ -186,7 +178,7 @@ void LCD_Task ( void* pvParameters )
     SensorData_t* sensor_data = (SensorData_t*) pvParameters;
     char          buffer[ 32 ];
 
-    vTaskDelay ( pdMS_TO_TICKS ( 100 ) );
+    vTaskDelay ( pdMS_TO_TICKS ( 500 ) );
 
     while ( 1 )
     {
@@ -210,6 +202,6 @@ void LCD_Task ( void* pvParameters )
         xil_printf ( "LCD Line 3: %s\r\n", buffer );
         lcd_display_string ( &IicInstance, buffer, 4 );
 
-        vTaskDelay ( pdMS_TO_TICKS ( 1000 ) );
+        vTaskDelay ( pdMS_TO_TICKS ( 500 ) );
     }
 }
