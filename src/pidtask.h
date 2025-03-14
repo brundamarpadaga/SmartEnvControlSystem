@@ -13,11 +13,6 @@
 #include "stdint.h"
 #include "stdio.h"
 
-<<<<<<< HEAD
-/* PID structure definitions, temp/humidity/lux */
-=======
-/* PID structure definition */
->>>>>>> prototype
 typedef struct
 {
     float    Kp;          // proportional gain
