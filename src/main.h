@@ -79,6 +79,6 @@ extern int         do_init ( void );
 extern void        Parse_Input_Task ( void* p );
 extern void        PID_Task ( void* p );
 extern void        Display_Task ( void* p );
-extern uint8_t correctedSignal (uint8_t enviro, float pidOut);
+extern uint8_t correctedSignal (uint8_t enviro, float pidOut, bool fanCrtl);
 extern void displayHelper (PID_t* pid, uint8_t btns, uint16_t sensorVal, uint16_t incr);
 #endif /* MAIN_H */
