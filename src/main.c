@@ -247,7 +247,7 @@ void Parse_Input_Task ( void* p )
                 NX4IO_setLEDs(sws);
                 xQueueSend ( toPID, &ValueToSend, mainDONT_BLOCK );
             }
-            vTaskDelay ( 100 ); // delay to prevent task from running too fast and wasting resources
+            vTaskDelay(pdMS_TO_TICKS(1000)); // delay to prevent task from running too fast and wasting resources
         }
 }
 
