@@ -130,7 +130,7 @@ int main ( void )
     xTaskCreate ( PID_Task, "PID", configMINIMAL_STACK_SIZE * 2, &sensor_data, 1, NULL );
     xTaskCreate ( Display_Task, "Disp", configMINIMAL_STACK_SIZE * 2, NULL, 1, NULL );
     xTaskCreate ( BME280_Task, "BME280", configMINIMAL_STACK_SIZE * 4, NULL, 1, NULL );
-    xTaskCreate ( LCD_Task, "LCD", configMINIMAL_STACK_SIZE * 4, &sensor_data, 1, NULL );
+    xTaskCreate ( LCD_Task, "LCD", configMINIMAL_STACK_SIZE * 4, &sensor_data, 2, NULL );
 
     xil_printf ( "Starting the scheduler\r\n" );
     vTaskStartScheduler ( );  // Launch FreeRTOS scheduler
@@ -202,23 +202,38 @@ void gpio_intr ( void* pvUnused )
  */
 int do_init ( void )
 {
-    int status;
+    int status = NX4IO_initialize ( N4IO_BASEADDR );
+    if ( status != XST_SUCCESS )
+    {
+        xil_printf ( "[ERROR] NX4IO init failed\r\n" );
+        return XST_FAILURE;
+    }
 
-    status = NX4IO_initialize ( N4IO_BASEADDR );  // Initialize NX4IO hardware
-    if ( status != XST_SUCCESS ) return XST_FAILURE;
+    XIic_Config* ConfigPtr = XIic_LookupConfig ( I2C_DEV_ID_ADDR );
+    if ( ConfigPtr == NULL )
+    {
+        xil_printf ( "[ERROR] I2C config lookup failed\r\n" );
+        return XST_FAILURE;
+    }
 
-    XIic_Config* ConfigPtr = XIic_LookupConfig ( I2C_DEV_ID_ADDR );  // Get I2C config
-    if ( ConfigPtr == NULL ) return XST_FAILURE;
+    status = XIic_CfgInitialize ( &IicInstance, ConfigPtr, ConfigPtr->BaseAddress );
+    if ( status != XST_SUCCESS )
+    {
+        xil_printf ( "[ERROR] I2C init failed: %d\r\n", status );
+        return status;
+    }
 
-    status = XIic_CfgInitialize ( &IicInstance, ConfigPtr, ConfigPtr->BaseAddress );  // Init I2C
-    if ( status != XST_SUCCESS ) return status;
+    status = XIic_Start ( &IicInstance );
+    if ( status != XST_SUCCESS )
+    {
+        xil_printf ( "[ERROR] I2C start failed: %d\r\n", status );
+        return status;
+    }
 
-    XIic_Start ( &IicInstance );                        // Start I2C controller
-    NX4IO_RGBLED_setChnlEn ( RGB1, true, true, true );  // Enable RGB1 channels
-    NX4IO_RGBLED_setChnlEn ( RGB2, true, true, true );  // Enable RGB2 channels
+    NX4IO_RGBLED_setChnlEn ( RGB1, true, true, true );
+    NX4IO_RGBLED_setChnlEn ( RGB2, true, true, true );
     return XST_SUCCESS;
 }
-
 /*
  * Function: Parse_Input_Task
  * Description: FreeRTOS task that monitors button and switch inputs. Responds

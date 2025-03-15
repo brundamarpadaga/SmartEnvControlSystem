@@ -52,7 +52,7 @@
 /* Register values - Predefined values for configuring TSL2561 registers */
 #define TSL2561_POWER_ON 0x03          // Power-on value for Control register (active mode)
 #define TSL2561_POWER_OFF 0x00         // Power-off value for Control register (inactive mode)
-#define TSL2561_TIMING_402MS_16X 0x02  // Timing register value: 402ms integration time, 16x gain
+#define TSL2561_TIMING_402MS_16X 0x02  //
 #define TSL2561_INT_DISABLE 0x00       // Interrupt register value: Disable interrupts (unused here)
 
 /* Timeout for I2C operations - Maximum cycles to wait for bus idle */
