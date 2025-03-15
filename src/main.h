@@ -21,12 +21,12 @@
 #include "timers.h"
 
 /* Project-specific includes */
-#include "bme280.h"
-#include "lcd.h"
 #include "nexys4IO.h"
 #include "pidtask.h"
 #include "platform.h"
 #include "tsl2561.h"
+#include "bme280.h"
+#include "lcd.h"
 
 /* Definitions for NEXYS4IO Peripheral */
 #define N4IO_DEVICE_ID XPAR_NEXYS4IO_0_DEVICE_ID
@@ -34,8 +34,6 @@
 #define N4IO_HIGHADDR XPAR_NEXYS4IO_0_S00_AXI_HIGHADDR
 #define I2C_BASE_ADDR XPAR_AXI_IIC_0_BASEADDR
 #define I2C_DEV_ID_ADDR XPAR_AXI_IIC_0_DEVICE_ID
-
-#define configASSERT_DEFINED 1
 
 #define BTN_CHANNEL 1
 #define SW_CHANNEL 2
@@ -67,36 +65,20 @@
     } while ( 0 )
 
 /* Global Instances */
-extern XGpio                    xInputGPIOInstance;
-extern XIic                     IicInstance;
+extern SemaphoreHandle_t binary_sem;
+extern XGpio             xInputGPIOInstance;
+extern xQueueHandle toPID;
+extern xQueueHandle fromPID;
+extern XIic IicInstance;
 extern struct bme280_calib_data calib_data;
-extern SemaphoreHandle_t        binary_sem;
-extern SemaphoreHandle_t        bme280_sem;
-extern SemaphoreHandle_t        oled_sem;
-extern SemaphoreHandle_t        i2c_sem;  // Global I2C semaphore
-extern xQueueHandle             toPID;
-extern xQueueHandle             fromPID;
-
-/* Structure to hold sensor data for LCD */
-typedef struct
-{
-    int32_t  temperature; /* In hundredths of �C */
-    uint32_t pressure;    /* In Pa */
-    uint32_t humidity;    /* In 1024ths of % */
-    uint16_t luminosity;  /* In lux */
-} SensorData_t;
-
-extern SensorData_t sensor_data;
 
 /* Function Declarations */
-void  prvSetupHardware ( void );     // Remove static, defined in main.c
-void  gpio_intr ( void* pvUnused );  // Remove static, defined in main.c
-int   do_init ( void );
-void  Parse_Input_Task ( void* p );
-void  PID_Task ( void* p );
-void  Display_Task ( void* p );
-bool  pid_init ( PID_t* pid );
-float pid_funct ( PID_t* pid, uint16_t lux_value, uint8_t switches );
-void  print_pid ( PID_t* pid );
-
+extern void prvSetupHardware ( void );
+extern void gpio_intr ( void* pvUnused );
+extern int         do_init ( void );
+extern void        Parse_Input_Task ( void* p );
+extern void        PID_Task ( void* p );
+extern void        Display_Task ( void* p );
+extern uint8_t correctedSignal (uint8_t enviro, float pidOut);
+extern void displayHelper (PID_t* pid, uint8_t btns, uint16_t sensorVal, uint16_t incr);
 #endif /* MAIN_H */
