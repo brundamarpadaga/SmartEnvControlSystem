@@ -312,7 +312,6 @@ void PID_Task (void* p)
     uint8_t envLight = 127; // 8-bit int value for controling "evironment lights"
     uint8_t envTemp = 127;  // 8-bit int value for controling "evironment temp"
     uint8_t envHum = 127;   // 8-bit int value for controling "evironment humidity"
-    uint8_t envTempFan = 127; // 8-bit int value for controling "evironment temp fan response"
     uint16_t btnSws;        // value recieved from the input task Q
     uint8_t btns = 0x10;    // btn values parsed from btnSws, start with center button "pressed"
     uint8_t sws;            // switch values parsed from btnSws
@@ -444,10 +443,9 @@ void PID_Task (void* p)
     	    */
 
     	    // update pwm signals for humidty, light, and temp control
-    	    envLight = correctedSignal(envLight, luxOUT, false);
-            envHum   = correctedSignal(envHum, humOUT, true);
-            envTemp	 = correctedSignal(envTemp, tempOUT, false);
-            envTempFan  = correctedSignal(envTemp, tempOUT, true);
+    	    envLight = correctedSignal(envLight, luxOUT);
+            envHum   = correctedSignal(envHum, humOUT);
+            envTemp  = correctedSignal(envTemp, tempOUT);
 
 
     	    /*Write to fan, status lights, enviro lights, and heater LED
@@ -505,7 +503,7 @@ void PID_Task (void* p)
                     NX4IO_RGBLED_setDutyCycle(RGB2, envTemp, (uint8_t)(0.75 * max_duty), envLight);
                 break;
                 default:
-                    NX4IO_RGBLED_setDutyCycle(RGB2, envTemp, (envHum + envTempFan)/2, envLight);
+                    NX4IO_RGBLED_setDutyCycle(RGB2, envTemp, (envHum + envTemp)/2, envLight);
                 break;
 
             }
@@ -625,7 +623,7 @@ float pid_funct (PID_t* pid, int32_t lux_value)
 *   @pidOut: percentage to correct duty cycle by given from PID function 
 *   
 *****************************************************************************/
-uint8_t correctedSignal (uint8_t enviro, float pidOut, bool fanCtrl)
+uint8_t correctedSignal (uint8_t enviro, float pidOut)
 {
     if ((enviro + (pidOut * max_duty)) >= max_duty)
     {
@@ -637,14 +635,7 @@ uint8_t correctedSignal (uint8_t enviro, float pidOut, bool fanCtrl)
     }
     else
     {
-    	if (fanCtrl)
-    	{
-    		enviro = (uint8_t)(enviro + (-1 * (pidOut * max_duty)));
-    	}
-    	else
-    	{
-    		enviro = (uint8_t)(enviro + (pidOut * max_duty));
-    	}
+        enviro = (uint8_t)(enviro + (pidOut * max_duty));
     }
     return enviro;
 }
