@@ -12,7 +12,7 @@ int tsl2561_init ( XIic* i2c )
     if ( xSemaphoreTake ( i2c_sem, pdMS_TO_TICKS ( 100 ) ) == pdTRUE )
     {
         i2c_soft_reset ( i2c );
-        vTaskDelay(pdMS_TO_TICKS(20));
+        usleep ( 20000 );
 
         int timeout = TIMEOUT_COUNTER;
         while ( XIic_IsIicBusy ( i2c ) && --timeout > 0 );
@@ -54,8 +54,7 @@ int tsl2561_init ( XIic* i2c )
         return XST_FAILURE;
     }
 
-    vTaskDelay(pdMS_TO_TICKS(410));
-
+    usleep ( 410000 );
     return XST_SUCCESS;
 }
 
@@ -69,7 +68,7 @@ float tsl2561_readChannel ( XIic* i2c, tsl2561_channel_t channel )
         buf[ 0 ] = ( channel == TSL2561_CHANNEL_0 ? DATA0LOW_REG : DATA1LOW_REG ) | 0x80;
 
         XIic_Stop ( i2c );
-        vTaskDelay(pdMS_TO_TICKS(5));
+        usleep ( 5000 );
         status = XIic_Start ( i2c );
         if ( status != XST_SUCCESS )
         {

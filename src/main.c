@@ -102,7 +102,7 @@ int main ( void )
     	return -1;
     }
     xSemaphoreGive ( bme280_sem );  // Initially available
-    
+
     // Create semaphore for OLED access synchronization
     oled_sem = xSemaphoreCreateBinary ( );
     if ( oled_sem == NULL )
@@ -137,7 +137,7 @@ int main ( void )
 
     // Create task for displaying values to OLED display
     xTaskCreate ( LCD_Task, "OLED", configMINIMAL_STACK_SIZE * 4, &sensorData, 2, NULL );
-    
+
     // Start the Scheduler
     xil_printf ( "Starting the scheduler\r\n" );
 
@@ -199,14 +199,14 @@ void prvSetupHardware ( void )
 void gpio_intr ( void* pvUnused )
 {
     // Flag for context switch necessity
-    BaseType_t xHigherPriorityTaskWoken = pdFALSE;  
-    
+    BaseType_t xHigherPriorityTaskWoken = pdFALSE;
+
     // Signal input task that an interrupt occurred
     xSemaphoreGiveFromISR ( binary_sem, &xHigherPriorityTaskWoken );
-    
+
     // Clear GPIO interrupt
     XGpio_InterruptClear ( &xInputGPIOInstance, XGPIO_IR_MASK );
-    
+
     // Yield to higher-priority task if needed
     portYIELD_FROM_ISR ( xHigherPriorityTaskWoken );
 }
@@ -247,7 +247,7 @@ void Parse_Input_Task ( void* p )
                 NX4IO_setLEDs(sws);
                 xQueueSend ( toPID, &ValueToSend, mainDONT_BLOCK );
             }
-            vTaskDelay(pdMS_TO_TICKS(1000)); // delay to prevent task from running too fast and wasting resources
+            vTaskDelay ( 100 ); // delay to prevent task from running too fast and wasting resources
         }
 }
 
@@ -298,7 +298,7 @@ int do_init ( void )
 *   Get Current lux readig from TSL2561 sensor
 *       done using the TSL2561 driver in implemented
 *       in the C file of the same name
-*   Execute PID algo function 
+*   Execute PID algo function
 *   Drive PWM signal for LED, use RGB writ commands
 *   write to display thread MsgQ to update
 *   setpoint and current lux
@@ -322,7 +322,7 @@ void PID_Task (void* p)
 
     // create PID structs for temperature, humidity, and lux control
     static PID_t pidLux, pidTemp, pidHum;
-    
+
     // initialize the pid struct if it hasn't been
     if(!isInitialized)
     {
@@ -381,7 +381,7 @@ void PID_Task (void* p)
                 float ch0 = tsl2561_readChannel(&IicInstance, TSL2561_CHANNEL_0); // visible and infrared
                 float ch1 = tsl2561_readChannel(&IicInstance, TSL2561_CHANNEL_1 ); // just infrared
                 sensorData->luminosity = (uint16_t)ch0 - ((uint16_t)ch1 * 0.5); // calculate lux value
-                
+
                 // update delta_t for PID calculations
                 pidLux.delta_t = ((currentLuxTick - lastLuxTick) * (1/100.0f));
                 // update last tick time for use in next dt calculation
@@ -389,7 +389,7 @@ void PID_Task (void* p)
 
                 // get correction percentage for lux
                 luxOUT  = pid_funct(&pidLux, (int32_t)sensorData->luminosity);
-            }	    
+            }
 
             // Get BME280 reading when semaphore is available and run PID algorithm for temp and humidity
             TickType_t currentBMETick = xTaskGetTickCount();
@@ -449,19 +449,19 @@ void PID_Task (void* p)
 
 
     	    /*Write to fan, status lights, enviro lights, and heater LED
-            *   NX4IO_RGBLED_setDutyCycle(RGBx, red, green, blue) 
+            *   NX4IO_RGBLED_setDutyCycle(RGBx, red, green, blue)
             *   RGB1_Red Status Red LED
             *   RGB1_Green Status Green LED
             *   RGB1_Blue Status Yellow LED
             *   RGB2_Red Duty for heater (Red LED)
             *   RGB2_Green Duty for fan
             *   RGB2_Blue Duty for enviro lights
-            * 
+            *
             *   First checks if both humidty and temp are within 5% pf setpoint
             *   if fails checks if noth out
             *   if that fails checks if just humidty is out
             *   if that fails sets just temp as out
-            * 
+            *
             *   updates status LEDs with max or min duty cycles based
             *   if signal is within setpoint or not
             */
@@ -487,13 +487,13 @@ void PID_Task (void* p)
                     NX4IO_RGBLED_setDutyCycle(RGB1, max_duty, min_duty, min_duty);
                 }
             }
-            
-            // check switchs 0-2 and determin what value to set fan on 
-            // fan will be driven by PID output or predefined percentages of 
+
+            // check switchs 0-2 and determin what value to set fan on
+            // fan will be driven by PID output or predefined percentages of
             // of 25, 50, and 75
             switch (sws & 0x07)
             {
-                case 0x01: 
+                case 0x01:
                     NX4IO_RGBLED_setDutyCycle(RGB2, envTemp, (uint8_t)(0.25 * max_duty), envLight);
                 break;
                 case 0x02:
@@ -534,7 +534,7 @@ void Display_Task (void* p)
 
         // write values to 7-seg display
         NX410_SSEG_setAllDigits(SSEGHI, (uint8_t)(setpnt/100),
-        (uint8_t)((setpnt%100)/10), (uint8_t)((setpnt%100)%10), 
+        (uint8_t)((setpnt%100)/10), (uint8_t)((setpnt%100)%10),
         CC_BLANK, DP_NONE);
         NX410_SSEG_setAllDigits(SSEGLO, (uint8_t)(luxVal/100),
         (uint8_t)((luxVal%100)/10), (uint8_t)((luxVal%100)%10),
@@ -555,7 +555,7 @@ bool pid_init (PID_t *pid)
     pid -> prev_error = 0;
     pid -> delta_t = 1; // set to the worst case sampling time but will dynamically update in use
 
-    // returns true after initializing PID structure 
+    // returns true after initializing PID structure
     return true;
 }
 
@@ -584,7 +584,7 @@ float pid_funct (PID_t* pid, int32_t lux_value)
     float Pterm;
     // set to zero if switch[0] is O, affectively disabling proportional control
     Pterm = pid->Kp * error;
-    
+
     // update integral, and get integral term
     // clamps to prevent Iterm from generating a value that would exceed 50% pwm range
     pid -> integral += (error * pid->delta_t);
@@ -599,7 +599,7 @@ float pid_funct (PID_t* pid, int32_t lux_value)
 
     float Iterm;
     // set to zero if switch[1] is 0
-    Iterm = pid->Ki * pid->integral;   
+    Iterm = pid->Ki * pid->integral;
 
     // get derivative term
     float Dterm;
@@ -620,8 +620,8 @@ float pid_funct (PID_t* pid, int32_t lux_value)
 *   to current duty cycle
 *
 *   @enviro: duty cycle that is currently being applied to actuator
-*   @pidOut: percentage to correct duty cycle by given from PID function 
-*   
+*   @pidOut: percentage to correct duty cycle by given from PID function
+*
 *****************************************************************************/
 uint8_t correctedSignal (uint8_t enviro, float pidOut)
 {
@@ -642,7 +642,7 @@ uint8_t correctedSignal (uint8_t enviro, float pidOut)
 
 /***********************7-Seg Display Helper********************************
 *   Create the message to send to the 7-Seg display
-*   
+*
 *   returns uint8_t duty cycle after applying PID correction percentage
 *   to current duty cycle
 *
@@ -652,7 +652,7 @@ uint8_t correctedSignal (uint8_t enviro, float pidOut)
 *   @incr: Increment amount, this should be 1 * (scaling for sensor)
 *   lux sensor has scaling of 1
 *   temp sensor has scaling of 100
-*   humidty sensor has scaling of 1024*   
+*   humidty sensor has scaling of 1024*
 *****************************************************************************/
 void displayHelper (PID_t* pid, uint8_t btns, uint16_t sensorVal, uint16_t incr)
 {

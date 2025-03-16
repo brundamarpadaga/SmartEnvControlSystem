@@ -35,7 +35,7 @@ int i2c_init ( void )
 
     /* Reset and enable I2C as master */
     XIic_WriteReg ( IicInstance.BaseAddress, 0x40, 0xA );    // Reset
-    vTaskDelay(pdMS_TO_TICKS(20));                           // 20ms reset timeout
+    usleep ( 20000 );                                        // 20ms reset timeout
     XIic_WriteReg ( IicInstance.BaseAddress, 0x100, 0x81 );  // Master + Enable
 
     /* Start I2C controller */
@@ -81,7 +81,7 @@ void i2c_scan ( XIic* InstancePtr )
                 devices_found++;
             }
         }
-        vTaskDelay(pdMS_TO_TICKS(1));  // Minimal delay for bus stability
+        usleep ( 1000 );  // Minimal delay for bus stability
     }
 }
 
@@ -94,9 +94,9 @@ void i2c_scan ( XIic* InstancePtr )
 int i2c_soft_reset ( XIic* InstancePtr )
 {
     XIic_WriteReg ( InstancePtr->BaseAddress, 0x40, 0xA );    // Reset
-    vTaskDelay(pdMS_TO_TICKS(20));                            // 20ms reset timeout
+    usleep ( 20000 );                                         // 20ms reset timeout
     XIic_WriteReg ( InstancePtr->BaseAddress, 0x100, 0x81 );  // Master + Enable
-    vTaskDelay(pdMS_TO_TICKS(5));
+    usleep ( 5000 );
 
     return XIic_IsIicBusy ( InstancePtr ) ? XST_FAILURE : XST_SUCCESS;
 }
