@@ -27,7 +27,7 @@ typedef struct
 
 // prototype for function that initializes PID structure
 // returns byte used for checking if init has happened or not
-bool pid_init ( PID_t* pid );
+bool pid_init ( PID_t* pid, char sensor );
 
 // prototype of pid function that returns the controlled signal as a float
 // takes lux_value, returned from TSL2561 sensor returns float vlaue
