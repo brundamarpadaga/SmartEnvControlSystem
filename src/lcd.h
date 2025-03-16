@@ -18,9 +18,11 @@
 #define LCD_H
 
 #include "FreeRTOS.h"  // For FreeRTOS types and functions (e.g., SemaphoreHandle_t, pdMS_TO_TICKS)
-#include "semphr.h"    // For semaphore handling
-#include "task.h"      // For task management (e.g., vTaskDelay)
-#include "xiic.h"      // For Xilinx I2C driver (XIic type and functions)
+#include "FreeRTOS.h"
+#include "queue.h"
+#include "semphr.h"      // For semaphore handling
+#include "task.h"        // For task management (e.g., vTaskDelay)
+#include "xiic.h"        // For Xilinx I2C driver (XIic type and functions)
 #include "xil_printf.h"  // For xil_printf debugging output
 
 /*
@@ -56,18 +58,10 @@ extern const uint8_t     ssd1306xled_font8x16[];  // 8x16 font data for text dis
  */
 int lcd_init ( XIic* i2c );
 
-/*
- * Function: lcd_display_string
- * Description: Displays a null-terminated string on the OLED at the specified page using
- *              an 8x16 font. Each character spans two pages (upper and lower halves).
- *              Ensures thread-safe access with a semaphore.
- * Parameters:
- *   - i2c: Pointer to the XIic instance for I2C communication
- *   - str: Pointer to the null-terminated string to display
- *   - page: Starting page number (0-6, as each character takes 2 pages)
- * Returns: int (XST_SUCCESS on success, XST_FAILURE on failure)
- */
-int lcd_display_string ( XIic* i2c, const char* str, uint8_t page );
+void lcd_display_string_via_queue ( XIic*        i2c,
+                                    const char*  str,
+                                    uint8_t      page,
+                                    xQueueHandle reply_queue );
 
 /*
  * Function: LCD_Task
