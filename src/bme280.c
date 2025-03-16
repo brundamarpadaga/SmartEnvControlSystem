@@ -75,6 +75,7 @@ int bme_read_calibration_data ( XIic* iic, struct bme280_calib_data* calib )
 
 void BME280_Task ( void* pvParameters )
 {
+	sensor_Data* sensor_data = (sensor_Data*) pvParameters;  // Cast parameter to access sensor data
     struct bme280_uncomp_data uncomp_data;
     uint8_t                   buffer[ 26 ];
     int                       status;
@@ -124,21 +125,9 @@ void BME280_Task ( void* pvParameters )
                                               ( buffer[ 5 ] >> 4 );
                     uncomp_data.humidity = ( (uint32_t) buffer[ 6 ] << 8 ) | buffer[ 7 ];
 
-                    sensor_data.temperature = compensate_temperature ( &uncomp_data, &calib_data );
-                    sensor_data.pressure    = compensate_pressure ( &uncomp_data, &calib_data );
-                    sensor_data.humidity    = compensate_humidity ( &uncomp_data, &calib_data );
-
-                    xil_printf ( "Raw T: %u, P: %u, H: %u\r\n",
-                                 uncomp_data.temperature,
-                                 uncomp_data.pressure,
-                                 uncomp_data.humidity );
-                    xil_printf ( "Temp: %d.%02d C, Press: %u.%02u hPa, Hum: %u.%02u%%\r\n",
-                                 sensor_data.temperature / 100,
-                                 abs ( sensor_data.temperature % 100 ),
-                                 sensor_data.pressure / 100,
-                                 sensor_data.pressure % 100,
-                                 sensor_data.humidity / 1024,
-                                 ( sensor_data.humidity % 1024 ) * 100 / 1024 );
+                    sensor_data->temperature = compensate_temperature ( &uncomp_data, &calib_data );
+                    sensor_data->pressure    = compensate_pressure ( &uncomp_data, &calib_data );
+                    sensor_data->humidity    = compensate_humidity ( &uncomp_data, &calib_data );
                 }
                 xSemaphoreGive ( i2c_sem );
             }
@@ -167,7 +156,7 @@ int32_t compensate_temperature ( const struct bme280_uncomp_data* uncomp_data,
              ( (int32_t) calib->dig_t3 ) ) >>
            14;
     int32_t t_fine = var1 + var2;
-    T              = ( t_fine * 5 + 128 ) >> 8;  // Temperature in hundredths of �C
+    T              = ( t_fine * 5 + 128 ) >> 8;  // Temperature in hundredths of C
     return T;
 }
 
