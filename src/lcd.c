@@ -27,63 +27,45 @@
 
 extern const uint8_t ssd1306xled_font8x16[];  // External 8x16 font array for rendering characters
 
-/*
- * Function: oled_write_cmd
- * Description: Sends a single command byte to the OLED display over I2C.
- *              Acquires the I2C semaphore to ensure thread-safe access, constructs a 2-byte packet
- *              (control byte + command), and transmits it. Releases the semaphore afterward.
- * Parameters:
- *   - i2c: Pointer to the XIic instance managing I2C communication
- *   - cmd: Command byte to send (e.g., 0xAF to turn display on)
- * Returns: None
- */
 static void oled_write_cmd ( XIic* i2c, uint8_t cmd )
 {
-    // Attempt to take the I2C semaphore with a 100ms timeout to prevent bus contention
-    if ( xSemaphoreTake ( i2c_sem, pdMS_TO_TICKS ( 100 ) ) == pdTRUE )
+    if ( xSemaphoreTake ( i2c_sem, pdMS_TO_TICKS ( 500 ) ) == pdTRUE )
     {
-        uint8_t buffer[ 2 ] = {
-            OLED_CMD,
-            cmd };  // Buffer: control byte (0x00) identifies command mode, followed by the command
-        // Send the 2-byte packet to the OLED’s I2C address and stop the transaction
-        XIic_Send ( i2c->BaseAddress, OLED_I2C_ADDR, buffer, 2, XIIC_STOP );
-        xSemaphoreGive ( i2c_sem );  // Release the semaphore for other tasks to use the I2C bus
-    }
-    // Note: No error handling here to keep the function lightweight; errors are logged elsewhere if
-    // needed
-}
-
-/*
- * Function: oled_write_data
- * Description: Writes a block of data (up to 32 bytes) to the OLED display over I2C.
- *              Uses a semaphore for thread safety, caps data at 32 bytes to match hardware limits,
- *              and sends it as a single transaction. This is used for pixel data like font
- * characters. Parameters:
- *   - i2c: Pointer to the XIic instance for I2C communication
- *   - data: Pointer to the data buffer to send (e.g., font bytes)
- *   - len: Length of data to send (in bytes, capped at 32)
- * Returns: None
- */
-static void oled_write_data ( XIic* i2c, uint8_t* data, uint32_t len )
-{
-    // Acquire the I2C semaphore with a 100ms timeout to ensure exclusive bus access
-    if ( xSemaphoreTake ( i2c_sem, pdMS_TO_TICKS ( 100 ) ) == pdTRUE )
-    {
-        uint8_t buffer[ 33 ];     // Buffer: 1 control byte + up to 32 data bytes (33 total)
-        buffer[ 0 ] = OLED_DATA;  // Control byte (0x40) indicates data mode
-        uint32_t bytes_to_send =
-            ( len > 32 ) ? 32 : len;  // Cap at 32 bytes to avoid exceeding OLED limits
-        for ( uint32_t i = 0; i < bytes_to_send;
-              i++ )  // Copy data into buffer, offset by 1 for control byte
+        uint8_t buffer[ 2 ] = { OLED_CMD, cmd };
+        int     bytes_sent  = XIic_Send ( i2c->BaseAddress, OLED_I2C_ADDR, buffer, 2, XIIC_STOP );
+        if ( bytes_sent != 2 )
         {
-            buffer[ i + 1 ] = data[ i ];
+            xil_printf ( "[LCD] Cmd 0x%02X failed, sent %d bytes\n", cmd, bytes_sent );
         }
-        // Send the buffer (control byte + data) to the OLED and stop the transaction
-        XIic_Send ( i2c->BaseAddress, OLED_I2C_ADDR, buffer, bytes_to_send + 1, XIIC_STOP );
-        xSemaphoreGive ( i2c_sem );  // Release the semaphore for other tasks
+        xSemaphoreGive ( i2c_sem );
+    }
+    else
+    {
+        xil_printf ( "[LCD] I2C semaphore timeout in oled_write_cmd\n" );
     }
 }
 
+/ static void oled_write_data ( XIic* i2c, uint8_t* data, uint32_t len )
+{
+    if ( xSemaphoreTake ( i2c_sem, pdMS_TO_TICKS ( 500 ) ) == pdTRUE )
+    {
+        uint8_t buffer[ 33 ];
+        buffer[ 0 ]            = OLED_DATA;
+        uint32_t bytes_to_send = ( len > 32 ) ? 32 : len;
+        memcpy ( &buffer[ 1 ], data, bytes_to_send );
+        int bytes_sent =
+            XIic_Send ( i2c->BaseAddress, OLED_I2C_ADDR, buffer, bytes_to_send + 1, XIIC_STOP );
+        if ( bytes_sent != bytes_to_send + 1 )
+        {
+            xil_printf ( "[LCD] Data write failed, sent %d bytes\n", bytes_sent );
+        }
+        xSemaphoreGive ( i2c_sem );
+    }
+    else
+    {
+        xil_printf ( "[LCD] I2C semaphore timeout in oled_write_data\n" );
+    }
+}
 /*
  * Function: lcd_init
  * Description: Initializes the OLED display by setting its I2C address and sending a sequence
@@ -95,53 +77,57 @@ static void oled_write_data ( XIic* i2c, uint8_t* data, uint32_t len )
  */
 int lcd_init ( XIic* i2c )
 {
-    // Set the OLED’s I2C address safely by acquiring the semaphore
-    if ( xSemaphoreTake ( i2c_sem, pdMS_TO_TICKS ( 100 ) ) == pdTRUE )
+    // Take semaphore once for address setup
+    if ( xSemaphoreTake ( i2c_sem, pdMS_TO_TICKS ( 500 ) ) != pdTRUE )
     {
-        // Configure the I2C peripheral to communicate with the OLED (typically at 0x3C)
-        int status = XIic_SetAddress ( i2c, XII_ADDR_TO_SEND_TYPE, OLED_I2C_ADDR );
-        if ( status != XST_SUCCESS )  // Check if address was set successfully
-        {
-            xSemaphoreGive ( i2c_sem );  // Release semaphore before early return
-            return XST_FAILURE;          // Return failure if address setup fails
-        }
-        xSemaphoreGive ( i2c_sem );  // Release semaphore after address configuration
-    }
-    else
-    {
-        return XST_FAILURE;  // Return failure if semaphore couldn’t be acquired
+        xil_printf ( "[LCD] Failed to take I2C semaphore\n" );
+        return XST_FAILURE;
     }
 
-    // Send SSD1306 initialization commands (no semaphore here; subsequent writes are atomic)
-    oled_write_cmd ( i2c, 0xAE );  // Turn display off to start in a known state
-    oled_write_cmd ( i2c, 0xD5 );  // Set display clock divide ratio/oscillator frequency
-    oled_write_cmd ( i2c, 0x80 );  // Default clock setting (divide ratio 1, frequency 8)
-    oled_write_cmd ( i2c, 0xA8 );  // Set multiplex ratio command
-    oled_write_cmd ( i2c, 0x3F );  // MUX ratio to 64 (for 128x64 display resolution)
-    oled_write_cmd ( i2c, 0xD3 );  // Set display offset command
-    oled_write_cmd ( i2c, 0x00 );  // No vertical offset
-    oled_write_cmd ( i2c, 0x40 );  // Set display start line to 0
-    oled_write_cmd ( i2c, 0x8D );  // Charge pump setting command
-    oled_write_cmd ( i2c, 0x14 );  // Enable charge pump for internal voltage generation
-    oled_write_cmd ( i2c, 0x20 );  // Set memory addressing mode command
-    oled_write_cmd ( i2c, 0x00 );  // Horizontal addressing mode for sequential writes
-    oled_write_cmd ( i2c, 0xA0 );  // Segment remap (column 0 to SEG0, normal orientation)
-    oled_write_cmd ( i2c, 0xC0 );  // COM output scan direction (normal, row 0 at top)
-    oled_write_cmd ( i2c, 0xDA );  // Set COM pins hardware configuration command
-    oled_write_cmd ( i2c, 0x12 );  // Alternative COM pin config for 128x64 display
-    oled_write_cmd ( i2c, 0x81 );  // Set contrast control command
-    oled_write_cmd ( i2c, 0xCF );  // High contrast value for better visibility
-    oled_write_cmd ( i2c, 0xD9 );  // Set pre-charge period command
-    oled_write_cmd ( i2c, 0xF1 );  // Phase 1: 1 DCLK, Phase 2: 15 DCLK (maximize brightness)
-    oled_write_cmd ( i2c, 0xDB );  // Set VCOMH deselect level command
-    oled_write_cmd ( i2c, 0x40 );  // VCOMH deselect level (0.77 * VCC)
-    oled_write_cmd ( i2c, 0xA4 );  // Resume display from RAM content (normal operation)
-    oled_write_cmd ( i2c, 0xA6 );  // Normal display mode (not inverted)
+    int status = XIic_SetAddress ( i2c, XII_ADDR_TO_SEND_TYPE, OLED_I2C_ADDR );
+    if ( status != XST_SUCCESS )
+    {
+        xil_printf ( "[LCD] Failed to set I2C address 0x%02X: %d\n", OLED_I2C_ADDR, status );
+        xSemaphoreGive ( i2c_sem );
+        return XST_FAILURE;
+    }
+    xSemaphoreGive ( i2c_sem );
+    xil_printf ( "[LCD] I2C address set to 0x%02X\n", OLED_I2C_ADDR );
 
-    clear_lcd ( i2c );  // Clear the display memory to start with a blank screen
+    // Original initialization sequence
+    oled_write_cmd ( i2c, 0xAE );  // Display off
+    oled_write_cmd ( i2c, 0xD5 );
+    oled_write_cmd ( i2c, 0x80 );  // Clock settings
+    oled_write_cmd ( i2c, 0xA8 );
+    oled_write_cmd ( i2c, 0x3F );  // Multiplex ratio
+    oled_write_cmd ( i2c, 0xD3 );
+    oled_write_cmd ( i2c, 0x00 );  // Offset
+    oled_write_cmd ( i2c, 0x40 );  // Start line
+    oled_write_cmd ( i2c, 0x8D );
+    oled_write_cmd ( i2c, 0x14 );  // Charge pump
+    usleep ( 10000 );              // 10ms delay for charge pump
+    oled_write_cmd ( i2c, 0x20 );
+    oled_write_cmd ( i2c, 0x00 );  // Horizontal addressing
+    oled_write_cmd ( i2c, 0xA0 );  // Segment remap
+    oled_write_cmd ( i2c, 0xC0 );  // COM scan direction
+    oled_write_cmd ( i2c, 0xDA );
+    oled_write_cmd ( i2c, 0x12 );  // COM pins
+    oled_write_cmd ( i2c, 0x81 );
+    oled_write_cmd ( i2c, 0xCF );  // Contrast
+    oled_write_cmd ( i2c, 0xD9 );
+    oled_write_cmd ( i2c, 0xF1 );  // Pre-charge
+    oled_write_cmd ( i2c, 0xDB );
+    oled_write_cmd ( i2c, 0x40 );  // VCOMH
+    oled_write_cmd ( i2c, 0xA4 );  // Display RAM
+    oled_write_cmd ( i2c, 0xA6 );  // Normal mode
 
-    oled_write_cmd ( i2c, 0xAF );  // Turn display on to make it visible
-    return XST_SUCCESS;            // Indicate successful initialization
+    clear_lcd ( i2c );  // Existing clear_lcd function
+
+    oled_write_cmd ( i2c, 0xAF );  // Display on
+    usleep ( 10000 );              // 10ms delay for display
+
+    xil_printf ( "[LCD] Initialization complete\n" );
+    return XST_SUCCESS;
 }
 
 /*
