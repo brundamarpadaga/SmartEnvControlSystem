@@ -21,12 +21,12 @@
 #include "timers.h"
 
 /* Project-specific includes */
+#include "bme280.h"
+#include "lcd.h"
 #include "nexys4IO.h"
 #include "pidtask.h"
 #include "platform.h"
 #include "tsl2561.h"
-#include "bme280.h"
-#include "lcd.h"
 
 /* Definitions for NEXYS4IO Peripheral */
 #define N4IO_DEVICE_ID XPAR_NEXYS4IO_0_DEVICE_ID
@@ -65,20 +65,20 @@
     } while ( 0 )
 
 /* Global Instances */
-extern SemaphoreHandle_t binary_sem;
-extern XGpio             xInputGPIOInstance;
-extern xQueueHandle toPID;
-extern xQueueHandle fromPID;
-extern XIic IicInstance;
+extern SemaphoreHandle_t        binary_sem;
+extern XGpio                    xInputGPIOInstance;
+extern xQueueHandle             toPID;
+extern xQueueHandle             fromPID;
+extern XIic                     IicInstance;
 extern struct bme280_calib_data calib_data;
 
 /* Function Declarations */
-extern void prvSetupHardware ( void );
-extern void gpio_intr ( void* pvUnused );
-extern int         do_init ( void );
-extern void        Parse_Input_Task ( void* p );
-extern void        PID_Task ( void* p );
-extern void        Display_Task ( void* p );
-extern uint8_t correctedSignal (uint8_t enviro, float pidOut);
-extern void displayHelper (PID_t* pid, uint8_t btns, uint16_t sensorVal, uint16_t incr);
+extern void    prvSetupHardware ( void );
+extern void    gpio_intr ( void* pvUnused );
+extern int     do_init ( void );
+extern void    Parse_Input_Task ( void* p );
+extern void    PID_Task ( void* p );
+extern void    Display_Task ( void* p );
+extern uint8_t correctedSignal ( uint8_t enviro, float pidOut, bool fanCrtl );
+extern void    displayHelper ( PID_t* pid, uint8_t btns, uint16_t sensorVal, uint16_t incr );
 #endif /* MAIN_H */
