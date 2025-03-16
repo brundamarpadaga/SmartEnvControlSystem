@@ -32,121 +32,108 @@ xQueueHandle             fromPID = NULL;
  * and queues), and tasks for the environmental control system. Starts the scheduler
  * to begin task execution.
  */
+// Add to global variables
+xQueueHandle i2c_request_queue;
+TaskHandle_t parse_input_handle, pid_handle, disp_handle, bme280_handle, oled_handle, i2c_handle;
+
 int main ( void )
 {
-    // Print startup message to console
     xil_printf ( "Hello from FreeRTOS LUX and BME280 PID Controller\r\n" );
-
-    // Set up hardware components (GPIO, interrupts, etc.)
     prvSetupHardware ( );
 
-    // Perform initial hardware and peripheral setup
     if ( do_init ( ) != XST_SUCCESS )
     {
         xil_printf ( "[ERROR] Hardware initialization failed\r\n" );
-        return -1;  // Exit if initialization fails
+        cleanup_system ( );
+        return -1;
     }
 
-    // Create I2C semaphore for bus access control
     i2c_sem = xSemaphoreCreateBinary ( );
     if ( i2c_sem == NULL )
     {
         xil_printf ( "[ERROR] I2C semaphore creation failed\r\n" );
+        cleanup_system ( );
         return -1;
     }
-    xSemaphoreGive ( i2c_sem );  // Release semaphore initially
+    xSemaphoreGive ( i2c_sem );
 
-    // Initialize TSL2561 light sensor via I2C
     if ( tsl2561_init ( &IicInstance ) != XST_SUCCESS )
     {
         xil_printf ( "[ERROR] TSL2561 initialization failed\r\n" );
+        cleanup_system ( );
         return -1;
     }
-
-    // Initialize BME280 environmental sensor
     if ( bme_init ( &IicInstance ) != 0 )
     {
         xil_printf ( "[ERROR] BME280 initialization failed\r\n" );
-        return -1;  // Exit if BME280 init fails
+        cleanup_system ( );
+        return -1;
     }
-    // Read BME280 calibration data for accurate measurements
     if ( bme_read_calibration_data ( &IicInstance, &calib_data ) != 0 )
     {
         xil_printf ( "[ERROR] BME280 calibration data read failed\r\n" );
-        return -1;  // Exit if calibration data read fails
+        cleanup_system ( );
+        return -1;
     }
-
-    // Initialize OLED display
     if ( lcd_init ( &IicInstance ) != XST_SUCCESS )
     {
         xil_printf ( "[ERROR] OLED initialization failed\r\n" );
+        cleanup_system ( );
         return -1;
     }
 
-    // Create binery_sem Semaphore for GPIO
     binary_sem = xSemaphoreCreateBinary ( );
     if ( binary_sem == NULL )
     {
-        xil_printf ( "[ERROR] I2C semaphore creation failed\r\n" );
+        xil_printf ( "[ERROR] Binary semaphore creation failed\r\n" );
+        cleanup_system ( );
         return -1;
     }
-    xSemaphoreGive ( binary_sem );  // Release semaphore initially
+    xSemaphoreGive ( binary_sem );
 
-    // Create semaphore for BME280 access synchronization
     bme280_sem = xSemaphoreCreateBinary ( );
     if ( bme280_sem == NULL )
     {
         xil_printf ( "[ERROR] BME280 semaphore creation failed\r\n" );
+        cleanup_system ( );
         return -1;
     }
-    xSemaphoreGive ( bme280_sem );  // Initially available
+    xSemaphoreGive ( bme280_sem );
 
-    // Create semaphore for OLED access synchronization
     oled_sem = xSemaphoreCreateBinary ( );
     if ( oled_sem == NULL )
     {
         xil_printf ( "[ERROR] OLED semaphore creation failed\r\n" );
+        cleanup_system ( );
         return -1;
     }
-    xSemaphoreGive ( oled_sem );  // Initially available
+    xSemaphoreGive ( oled_sem );
 
-    /* Create the queue */
-    toPID   = xQueueCreate ( mainQUEUE_LENGTH, sizeof ( uint16_t ) );
-    fromPID = xQueueCreate ( mainQUEUE_LENGTH, sizeof ( uint32_t ) );
+    i2c_request_queue = xQueueCreate ( 10, sizeof ( i2c_request_t ) );
+    toPID             = xQueueCreate ( mainQUEUE_LENGTH, sizeof ( uint16_t ) );
+    fromPID           = xQueueCreate ( mainQUEUE_LENGTH, sizeof ( uint32_t ) );
+    if ( !i2c_request_queue || !toPID || !fromPID )
+    {
+        xil_printf ( "[ERROR] Queue creation failed\r\n" );
+        cleanup_system ( );
+        return -1;
+    }
 
-    /* Sanity check that the queue was created. */
-    configASSERT ( toPID );
-    configASSERT ( fromPID );
-
-    /*Creat structure for bme280 data*/
     static sensor_Data sensorData;
-
-    // Create task to parse user inputs
     xTaskCreate (
-        Parse_Input_Task, (const char*) "Parse_Input", configMINIMAL_STACK_SIZE, NULL, 1, NULL );
+        Parse_Input_Task, "Parse_Input", configMINIMAL_STACK_SIZE, NULL, 1, &parse_input_handle );
+    xTaskCreate ( PID_Task, "PID", configMINIMAL_STACK_SIZE, &sensorData, 1, &pid_handle );
+    xTaskCreate ( Display_Task, "Disp", configMINIMAL_STACK_SIZE, NULL, 1, &disp_handle );
+    xTaskCreate (
+        BME280_Task, "BME280", configMINIMAL_STACK_SIZE * 2, &sensorData, 1, &bme280_handle );
+    xTaskCreate ( LCD_Task, "OLED", configMINIMAL_STACK_SIZE * 4, &sensorData, 2, &oled_handle );
+    xTaskCreate ( I2C_Task, "I2C", configMINIMAL_STACK_SIZE, NULL, 2, &i2c_handle );
 
-    // Create PID task for controlling light intensity
-    xTaskCreate ( PID_Task, "PID", configMINIMAL_STACK_SIZE, &sensorData, 1, NULL );
-
-    // Create task for displaying values to 7-segment display
-    xTaskCreate ( Display_Task, "Disp", configMINIMAL_STACK_SIZE, NULL, 1, NULL );
-
-    // Create BME280 task collects environment data (temp, pressure, humidity)
-    xTaskCreate ( BME280_Task,
-                  "BME280",
-                  configMINIMAL_STACK_SIZE * 2,
-                  &sensorData,
-                  1,
-                  NULL );  // BME280 sensor task (larger stack)
-
-    // Create task for displaying values to OLED display
-    xTaskCreate ( LCD_Task, "OLED", configMINIMAL_STACK_SIZE * 4, &sensorData, 2, NULL );
-
-    // Start the Scheduler
     xil_printf ( "Starting the scheduler\r\n" );
-
     vTaskStartScheduler ( );
 
+    // If scheduler exits (unlikely in embedded system), cleanup
+    cleanup_system ( );
     return -1;
 }
 
@@ -692,4 +679,179 @@ void displayHelper ( PID_t* pid, uint8_t btns, uint16_t sensorVal, uint16_t incr
     message |=
         ( ( sensorVal << 0 ) | ( ( pid->setpoint / incr ) << 16 ) );  // build mesasge for 7-seg
     xQueueSend ( fromPID, &message, mainDONT_BLOCK );                 // send message to 7-seg
+}
+
+void cleanup_system ( void )
+{
+    // Stop the scheduler (optional, depending on use case)
+    vTaskSuspendAll ( );
+
+    // Delete tasks (requires task handles)
+    if ( xTaskGetHandle ( "Parse_Input" ) != NULL )
+        vTaskDelete ( xTaskGetHandle ( "Parse_Input" ) );
+    if ( xTaskGetHandle ( "PID" ) != NULL ) vTaskDelete ( xTaskGetHandle ( "PID" ) );
+    if ( xTaskGetHandle ( "Disp" ) != NULL ) vTaskDelete ( xTaskGetHandle ( "Disp" ) );
+    if ( xTaskGetHandle ( "BME280" ) != NULL ) vTaskDelete ( xTaskGetHandle ( "BME280" ) );
+    if ( xTaskGetHandle ( "OLED" ) != NULL ) vTaskDelete ( xTaskGetHandle ( "OLED" ) );
+    if ( xTaskGetHandle ( "I2C" ) != NULL ) vTaskDelete ( xTaskGetHandle ( "I2C" ) );
+
+    // Delete queues
+    if ( i2c_request_queue != NULL )
+    {
+        vQueueDelete ( i2c_request_queue );
+        i2c_request_queue = NULL;
+    }
+    if ( toPID != NULL )
+    {
+        vQueueDelete ( toPID );
+        toPID = NULL;
+    }
+    if ( fromPID != NULL )
+    {
+        vQueueDelete ( fromPID );
+        fromPID = NULL;
+    }
+
+    // Delete semaphores
+    if ( i2c_sem != NULL )
+    {
+        vSemaphoreDelete ( i2c_sem );
+        i2c_sem = NULL;
+    }
+    if ( binary_sem != NULL )
+    {
+        vSemaphoreDelete ( binary_sem );
+        binary_sem = NULL;
+    }
+    if ( bme280_sem != NULL )
+    {
+        vSemaphoreDelete ( bme280_sem );
+        bme280_sem = NULL;
+    }
+    if ( oled_sem != NULL )
+    {
+        vSemaphoreDelete ( oled_sem );
+        oled_sem = NULL;
+    }
+
+    // Stop I2C hardware
+    XIic_Stop ( &IicInstance );
+
+    // Disable GPIO interrupts
+    XGpio_InterruptDisable ( &xInputGPIOInstance, XGPIO_IR_CH1_MASK );
+    XGpio_InterruptGlobalDisable ( &xInputGPIOInstance );
+
+    xil_printf ( "System cleanup completed\r\n" );
+}
+
+void I2C_Task ( void* p )
+{
+    i2c_request_t req;
+
+    while ( 1 )
+    {
+        if ( xQueueReceive ( i2c_request_queue, &req, portMAX_DELAY ) == pdPASS )
+        {
+            xSemaphoreTake ( i2c_sem, portMAX_DELAY );
+
+            switch ( req.type )
+            {
+                case READ_TSL2561_CH0:
+                    *req.result = tsl2561_readChannel ( &IicInstance, TSL2561_CHANNEL_0 );
+                    xQueueSend ( req.reply_queue, req.result, mainDONT_BLOCK );
+                    break;
+
+                case READ_TSL2561_CH1:
+                    *req.result = tsl2561_readChannel ( &IicInstance, TSL2561_CHANNEL_1 );
+                    xQueueSend ( req.reply_queue, req.result, mainDONT_BLOCK );
+                    break;
+
+                case READ_BME280_TEMP:
+                case READ_BME280_HUM:
+                case READ_BME280_PRESS:
+                {
+                    struct bme280_uncomp_data uncomp_data;
+                    uint8_t                   buffer[ 8 ];
+                    int                       status;
+
+                    buffer[ 0 ] = REG_DATA;
+                    status      = XIic_Send (
+                        IicInstance.BaseAddress, BME280_I2C_ADDR, buffer, 1, XIIC_REPEATED_START );
+                    status += XIic_Recv (
+                        IicInstance.BaseAddress, BME280_I2C_ADDR, buffer, 8, XIIC_STOP );
+
+                    if ( status == 9 )
+                    {  // 1 byte sent + 8 bytes received
+                        uncomp_data.pressure = ( (uint32_t) buffer[ 0 ] << 12 ) |
+                                               ( (uint32_t) buffer[ 1 ] << 4 ) |
+                                               ( buffer[ 2 ] >> 4 );
+                        uncomp_data.temperature = ( (uint32_t) buffer[ 3 ] << 12 ) |
+                                                  ( (uint32_t) buffer[ 4 ] << 4 ) |
+                                                  ( buffer[ 5 ] >> 4 );
+                        uncomp_data.humidity = ( (uint32_t) buffer[ 6 ] << 8 ) | buffer[ 7 ];
+
+                        if ( req.type == READ_BME280_TEMP )
+                        {
+                            *req.result =
+                                (float) compensate_temperature ( &uncomp_data, &calib_data );
+                        }
+                        else if ( req.type == READ_BME280_HUM )
+                        {
+                            *req.result = (float) compensate_humidity ( &uncomp_data, &calib_data );
+                        }
+                        else if ( req.type == READ_BME280_PRESS )
+                        {
+                            *req.result = (float) compensate_pressure ( &uncomp_data, &calib_data );
+                        }
+
+                        xQueueSend ( req.reply_queue, req.result, mainDONT_BLOCK );
+                    }
+                    else
+                    {
+                        *req.result = 0.0f;
+                        xQueueSend ( req.reply_queue, req.result, mainDONT_BLOCK );
+                        xil_printf ( "[ERROR] BME280 read failed in I2C_Task, status: %d\r\n",
+                                     status );
+                    }
+                    break;
+                }
+                case WRITE_LCD_CMD:
+                {
+                    uint8_t buffer[ 2 ] = { OLED_CMD, req.cmd };
+                    XIic_Send ( IicInstance.BaseAddress, OLED_I2C_ADDR, buffer, 2, XIIC_STOP );
+                    if ( req.reply_queue )
+                    {
+                        uint8_t reply = 1;
+                        xQueueSend ( req.reply_queue, &reply, mainDONT_BLOCK );
+                    }
+                    break;
+                }
+
+                case WRITE_LCD_DATA:
+                {
+                    uint8_t buffer[ 129 ];  // 1 control + 128 bytes
+                    buffer[ 0 ]            = OLED_DATA;
+                    uint32_t bytes_to_send = ( req.len > 128 ) ? 128 : req.len;
+                    memcpy ( &buffer[ 1 ], req.data, bytes_to_send );
+                    XIic_Send ( IicInstance.BaseAddress,
+                                OLED_I2C_ADDR,
+                                buffer,
+                                bytes_to_send + 1,
+                                XIIC_STOP );
+                    if ( req.reply_queue )
+                    {
+                        uint8_t reply = 1;
+                        xQueueSend ( req.reply_queue, &reply, mainDONT_BLOCK );
+                    }
+                    break;
+                }
+
+                default:
+                    xil_printf ( "[ERROR] Unknown I2C request type: %d\r\n", req.type );
+                    break;
+            }
+
+            xSemaphoreGive ( i2c_sem );  // Release I2C bus
+        }
+    }
 }

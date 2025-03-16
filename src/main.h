@@ -64,6 +64,34 @@
         }                                                         \
     } while ( 0 )
 
+/* I2C request types */
+typedef enum
+{
+    READ_TSL2561_CH0,
+    READ_TSL2561_CH1,
+    READ_BME280_TEMP,
+    READ_BME280_HUM,
+    READ_BME280_PRESS,
+    WRITE_LCD_CMD,
+    WRITE_LCD_DATA
+} i2c_request_type_t;
+
+/* I2C request structure */
+typedef struct
+{
+    i2c_request_type_t type;         // Type of I2C operation
+    float*             result;       // For read operations (NULL for writes)
+    uint8_t*           data;         // For LCD data writes (NULL for others)
+    uint32_t           len;          // Length of data for LCD writes (0 for others)
+    uint8_t            cmd;          // For LCD command writes (ignored for others)
+    xQueueHandle       reply_queue;  // Queue to send result back (NULL for writes)
+} i2c_request_t;
+
+/* Global I2C request queue */
+extern xQueueHandle i2c_request_queue;
+
+/* Global I2C request queue */
+extern xQueueHandle i2c_request_queue;
 /* Global Instances */
 extern SemaphoreHandle_t        binary_sem;
 extern XGpio                    xInputGPIOInstance;
@@ -81,4 +109,7 @@ extern void    PID_Task ( void* p );
 extern void    Display_Task ( void* p );
 extern uint8_t correctedSignal ( uint8_t enviro, float pidOut, bool fanCrtl );
 extern void    displayHelper ( PID_t* pid, uint8_t btns, uint16_t sensorVal, uint16_t incr );
+extern void    cleanup_system ( void );
+extern void    I2C_Task ( void* p );
+
 #endif /* MAIN_H */
