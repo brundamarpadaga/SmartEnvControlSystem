@@ -66,21 +66,17 @@ static void oled_write_cmd ( XIic* i2c, uint8_t cmd )
  */
 static void oled_write_data ( XIic* i2c, uint8_t* data, uint32_t len )
 {
-    // Acquire the I2C semaphore with a 100ms timeout to ensure exclusive bus access
     if ( xSemaphoreTake ( i2c_sem, pdMS_TO_TICKS ( 100 ) ) == pdTRUE )
     {
-        uint8_t buffer[ 33 ];     // Buffer: 1 control byte + up to 32 data bytes (33 total)
-        buffer[ 0 ] = OLED_DATA;  // Control byte (0x40) indicates data mode
-        uint32_t bytes_to_send =
-            ( len > 32 ) ? 32 : len;  // Cap at 32 bytes to avoid exceeding OLED limits
-        for ( uint32_t i = 0; i < bytes_to_send;
-              i++ )  // Copy data into buffer, offset by 1 for control byte
+        uint8_t buffer[ 33 ];  // 1 control byte + 32 data bytes max
+        buffer[ 0 ]            = OLED_DATA;
+        uint32_t bytes_to_send = ( len > 32 ) ? 32 : len;
+        for ( uint32_t i = 0; i < bytes_to_send; i++ )
         {
             buffer[ i + 1 ] = data[ i ];
         }
-        // Send the buffer (control byte + data) to the OLED and stop the transaction
         XIic_Send ( i2c->BaseAddress, OLED_I2C_ADDR, buffer, bytes_to_send + 1, XIIC_STOP );
-        xSemaphoreGive ( i2c_sem );  // Release the semaphore for other tasks
+        xSemaphoreGive ( i2c_sem );
     }
 }
 
@@ -183,60 +179,49 @@ void clear_lcd ( XIic* i2c )
  */
 int lcd_display_string ( XIic* i2c, const char* str, uint8_t page )
 {
-    if ( page > 7 )
-        return XST_FAILURE;  // Validate page number (0-7 max, but 0-6 practical for 2-page chars)
+    if ( page > 7 ) return XST_FAILURE;  // Match original range
 
-    // Prepare a 256-byte buffer: 128 bytes for the upper page, 128 for the lower page
-    uint8_t line_buffer[ 256 ] = { 0 };  // Initialized to zeros to clear unused areas
-    uint8_t col                = 0;      // Track current column position (0-127)
+    uint8_t line_buffer[ 256 ] = { 0 };
+    uint8_t col                = 0;
 
-    // Build the string in the buffer
-    for ( uint32_t i = 0; str[ i ] != '\0' && col < 128;
-          i++ )  // Iterate until null or display width reached
+    // Buffer construction (match original)
+    for ( uint32_t i = 0; str[ i ] != '\0' && col < 128; i++ )
     {
-        uint16_t font_offset = 4;         // Offset past the 4-byte font header
-        char     c           = str[ i ];  // Get the current character
-        if ( c >= ' ' && c <= '~' )       // Check if character is in printable ASCII range
+        uint16_t font_offset = 4;
+        char     c           = str[ i ];
+        if ( c >= ' ' && c <= '~' )
         {
-            font_offset +=
-                ( c - ' ' ) * 16;  // Calculate font array offset (16 bytes per character)
+            font_offset += ( c - ' ' ) * 16;
         }
-        else
+        for ( uint8_t j = 0; j < 8; j++ )
         {
-            font_offset += 0 * 16;  // Default to space for non-printable characters
+            line_buffer[ col + j ]       = ssd1306xled_font8x16[ font_offset + j ];
+            line_buffer[ 128 + col + j ] = ssd1306xled_font8x16[ font_offset + 8 + j ];
         }
-
-        // Copy the character’s upper and lower 8x8 halves into the buffer
-        for ( uint8_t j = 0; j < 8; j++ )  // Each character is 8 pixels wide
-        {
-            line_buffer[ col + j ] = ssd1306xled_font8x16[ font_offset + j ];  // Upper page data
-            line_buffer[ 128 + col + j ] =
-                ssd1306xled_font8x16[ font_offset + 8 + j ];  // Lower page data
-        }
-        col += 8;  // Advance column by 8 pixels (character width)
+        col += 8;
     }
 
-    // Write the buffered data for the upper page
-    oled_write_cmd ( i2c, 0xB0 + page );  // Set the starting page address
-    oled_write_cmd ( i2c, 0x00 );         // Set column address lower nibble to 0
-    oled_write_cmd ( i2c, 0x10 );  // Set column address upper nibble to 0 (start at column 0)
-    for ( uint8_t i = 0; i < 128; i += 32 )  // Write 128 columns in 32-byte chunks
+    // Write upper page (per-chunk semaphore via oled_write_data)
+    oled_write_cmd ( i2c, 0xB0 + page );
+    oled_write_cmd ( i2c, 0x00 );
+    oled_write_cmd ( i2c, 0x10 );
+    for ( uint8_t i = 0; i < 128; i += 32 )
     {
-        uint8_t chunk_size = ( 128 - i > 32 ) ? 32 : ( 128 - i );  // Adjust last chunk size if < 32
-        oled_write_data ( i2c, &line_buffer[ i ], chunk_size );    // Write upper page data
+        uint8_t chunk_size = ( 128 - i > 32 ) ? 32 : ( 128 - i );
+        oled_write_data ( i2c, &line_buffer[ i ], chunk_size );
     }
 
-    // Write the buffered data for the lower page
-    oled_write_cmd ( i2c, 0xB0 + page + 1 );  // Set the next page address
-    oled_write_cmd ( i2c, 0x00 );             // Reset column address lower nibble to 0
-    oled_write_cmd ( i2c, 0x10 );             // Reset column address upper nibble to 0
-    for ( uint8_t i = 0; i < 128; i += 32 )   // Write 128 columns in 32-byte chunks
+    // Write lower page
+    oled_write_cmd ( i2c, 0xB0 + page + 1 );
+    oled_write_cmd ( i2c, 0x00 );
+    oled_write_cmd ( i2c, 0x10 );
+    for ( uint8_t i = 0; i < 128; i += 32 )
     {
-        uint8_t chunk_size = ( 128 - i > 32 ) ? 32 : ( 128 - i );      // Adjust last chunk size
-        oled_write_data ( i2c, &line_buffer[ 128 + i ], chunk_size );  // Write lower page data
+        uint8_t chunk_size = ( 128 - i > 32 ) ? 32 : ( 128 - i );
+        oled_write_data ( i2c, &line_buffer[ 128 + i ], chunk_size );
     }
 
-    return XST_SUCCESS;  // Indicate successful string display
+    return XST_SUCCESS;
 }
 
 /*
@@ -251,41 +236,42 @@ int lcd_display_string ( XIic* i2c, const char* str, uint8_t page )
  */
 void LCD_Task ( void* pvParameters )
 {
-	sensor_Data* sensor_data = (sensor_Data*) pvParameters;  // Cast parameter to access sensor data
-    char buffer[ 32 ];                 // Buffer for formatting sensor data strings (max 32 chars)
-
-    vTaskDelay ( pdMS_TO_TICKS (
-        100 ) );  // Initial delay of 100ms to allow system startup before first update
-
-    while ( 1 )  // Infinite loop for continuous display updates
+    sensor_Data* sensor_data = (sensor_Data*) pvParameters;
+    char         buffer[ 32 ];
+    vTaskDelay ( pdMS_TO_TICKS ( 100 ) );  // Initial delay
+    while ( 1 )
     {
-        // Acquire the OLED semaphore with a 100ms timeout to ensure thread-safe access
         if ( xSemaphoreTake ( oled_sem, pdMS_TO_TICKS ( 100 ) ) == pdTRUE )
         {
-            // Format temperature string (e.g., "T:25.50C")
+            // Line 1: Temperature (Pages 0-1)
             snprintf ( buffer,
                        sizeof ( buffer ),
                        "T:%ld.%02ldC",
-                       (long) ( sensor_data->temperature / 100 ),  // Integer part of temperature
-                       (long) abs ( sensor_data->temperature % 100 ) );  // Decimal part (2 digits)
-            lcd_display_string ( &IicInstance, buffer, 0 );  // Update temperature on pages 0-1
+                       (long) ( sensor_data->temperature / 100 ),
+                       (long) abs ( sensor_data->temperature % 100 ) );
+            lcd_display_string ( &IicInstance, buffer, 0 );
 
-            // Format pressure and humidity string (e.g., "P:1013h H:50%")
+            // Line 2: Humidity (Pages 2-3)
             snprintf ( buffer,
                        sizeof ( buffer ),
-                       "P:%luh H:%lu%%",
-                       (unsigned long) ( sensor_data->pressure / 100 ),     // Pressure in hPa
-                       (unsigned long) ( sensor_data->humidity / 1024 ) );  // Humidity in percent
-            lcd_display_string (
-                &IicInstance, buffer, 2 );  // Update pressure/humidity on pages 2-3
+                       "H:%lu%%",
+                       (unsigned long) ( sensor_data->humidity / 1024 ) );
+            lcd_display_string ( &IicInstance, buffer, 2 );
 
-            // Format luminosity string (e.g., "L:1234")
-            snprintf ( buffer, sizeof ( buffer ), "L:%u", sensor_data->luminosity );  // Lux value
-            lcd_display_string ( &IicInstance, buffer, 4 );  // Update luminosity on pages 4-5
+            // Line 3: Pressure (Pages 4-5)
+            snprintf ( buffer,
+                       sizeof ( buffer ),
+                       "P:%luh",
+                       (unsigned long) ( sensor_data->pressure / 100 ) );
+            lcd_display_string ( &IicInstance, buffer, 4 );
 
-            xSemaphoreGive ( oled_sem );  // Release semaphore after all updates are complete
+            // Line 4: Luminosity (Pages 6-7)
+            snprintf ( buffer, sizeof ( buffer ), "L:%u", sensor_data->luminosity );
+            lcd_display_string ( &IicInstance, buffer, 6 );
+
+            xSemaphoreGive ( oled_sem );
         }
-        vTaskDelay ( pdMS_TO_TICKS ( 100 ) );  // Delay 100ms (10 Hz refresh) for smooth updates
+        vTaskDelay ( pdMS_TO_TICKS ( 100 ) );  // 10 Hz update
     }
 }
 
