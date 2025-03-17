@@ -124,7 +124,7 @@ int main ( void )
 
     /* Create the queue */
     i2c_request_queue = xQueueCreate ( 10, sizeof ( i2c_request_t ) );
-    toPID = xQueueCreate (mainQUEUE_LENGTH, sizeof (uint16_t));
+    toPID = xQueueCreate (mainQUEUE_LENGTH + 1, sizeof (uint16_t));
     fromPID = xQueueCreate (mainQUEUE_LENGTH, sizeof (uint32_t));
 
     /* Sanity check that the queue was created. */
@@ -255,19 +255,6 @@ void Parse_Input_Task ( void* p )
             NX4IO_setLEDs(sws);
             xQueueSend ( toPID, &ValueToSend, mainDONT_BLOCK );
         }
-        else
-        {
-            // switch values checked even if buttons aren't pressed
-            // and sends them to PID task if they change
-            sws = (uint8_t)(NX4IO_getSwitches() & 0x00FF); // get lower 8 switches
-            if ((sws & ValueToSend) != sws)
-            {
-                ValueToSend &= 0x0000 ; // make sure old data is cleared
-                ValueToSend |= (sws);
-                NX4IO_setLEDs(sws);
-                xQueueSend ( toPID, &ValueToSend, mainDONT_BLOCK );
-            }
-        }
 }
 
 /****************************************************************************
@@ -354,6 +341,11 @@ void PID_Task (void* p)
         }
     }
 
+    // set initial data to PID set points to mitigate false on for PID control
+    sensorData->humidity = pidHum.setpoint;
+	sensorData->luminosity = pidLux.setpoint;
+	sensorData->temperature = pidTemp.setpoint;
+
     // main task loop
     while(1)
     {
@@ -377,7 +369,8 @@ void PID_Task (void* p)
                 // btn values should retain the last btnc/bntl/btnr value that was pressed
                 // sws values should retain the last switch values
     	    	btns &= 0x13;
-    	    	sws = sws;
+    	    	sws = (uint8_t)(NX4IO_getSwitches() & 0x00FF); // get lower 8 switches
+                NX4IO_setLEDs(sws);
     	    }
 
     	    // updated increment scaler based on the switch 3 and 4
@@ -528,7 +521,7 @@ void PID_Task (void* p)
 
             }
 
-            vTaskDelay ( pdMS_TO_TICKS ( 100 ) ); // 100ms delay to allow time for interrupts to be processed
+           vTaskDelay ( pdMS_TO_TICKS ( 10 ) ); // 100ms delay to allow time for interrupts to be processed
     }
 }
 
@@ -567,9 +560,9 @@ void Display_Task (void* p)
 *****************************************************************************/
 bool pid_init (PID_t *pid, char sensor)
 {
-    pid -> Kp = 0.7;
-    pid -> Ki = 0.2;
-    pid -> Kd = 0.01;
+    pid -> Kp = 1;
+    pid -> Ki = 0.02;
+    pid -> Kd = 0.001;
     if (sensor == 'L')
     {
     	pid->setpoint = 200;
@@ -605,8 +598,8 @@ bool pid_init (PID_t *pid, char sensor)
 float pid_funct (PID_t* pid, int32_t lux_value)
 {
 	// limits for integral range
-	float max_int =  1024;
-	float min_int = -1024;
+	float max_int =  512;
+	float min_int = -512;
 
     // e(t), error at time of sample
     float error = pid->setpoint - lux_value;
@@ -641,7 +634,7 @@ float pid_funct (PID_t* pid, int32_t lux_value)
     pid->prev_error = error;
 
     // return a percentage value to be used for setting the intensity of PWM LED
-    return ((!pid->prev_error)&&(!error))?((Pterm + Iterm + Dterm) / (float)pid->setpoint) : (error / (float)pid->setpoint);
+    return ((!pid->prev_error)&&(!error)) ? (error / (float)pid->setpoint) : ((Pterm + Iterm + Dterm) / (float)pid->setpoint);
 }
 
 /*********************PID Helper*************************************
