@@ -65,6 +65,16 @@ struct bme280_uncomp_data
     uint32_t humidity;
 };
 
+
+/*Added here for use with BME and PID task in main C file, not part of Bosch standard library*/
+typedef struct
+{
+    int32_t  temperature; /* In hundredths of °C */
+    uint32_t pressure;    /* In Pa */
+    uint32_t humidity;    /* In 1024ths of % */
+    uint16_t luminosity;  /* In lux */
+} sensor_Data;
+
 /*--------------------------------------------------------------------------*/
 /* External Declarations                                                    */
 /*--------------------------------------------------------------------------*/
