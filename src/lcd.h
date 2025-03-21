@@ -11,19 +11,19 @@
  *          string display, display clearing, and a dedicated FreeRTOS task for updates.
  *
  * Course: ECE 544 - Embedded Systems Design, Winter 2025
- * Authors: [Not specified]
+ *
  */
 
 #ifndef LCD_H
 #define LCD_H
 
-#include "FreeRTOS.h"  // For FreeRTOS types and functions (e.g., SemaphoreHandle_t, pdMS_TO_TICKS)
+#include "FreeRTOS.h" // For FreeRTOS types and functions (e.g., SemaphoreHandle_t, pdMS_TO_TICKS)
 #include "FreeRTOS.h"
 #include "queue.h"
-#include "semphr.h"      // For semaphore handling
-#include "task.h"        // For task management (e.g., vTaskDelay)
-#include "xiic.h"        // For Xilinx I2C driver (XIic type and functions)
-#include "xil_printf.h"  // For xil_printf debugging output
+#include "semphr.h"     // For semaphore handling
+#include "task.h"       // For task management (e.g., vTaskDelay)
+#include "xiic.h"       // For Xilinx I2C driver (XIic type and functions)
+#include "xil_printf.h" // For xil_printf debugging output
 
 /*
  * Constants:
@@ -31,9 +31,9 @@
  * - OLED_CMD: Control byte for sending commands to the OLED (0x00)
  * - OLED_DATA: Control byte for sending data to the OLED (0x40)
  */
-#define OLED_I2C_ADDR 0x3C  // Default I2C address for SSD1306 OLED
-#define OLED_CMD 0x00       // Command mode identifier for I2C transactions
-#define OLED_DATA 0x40      // Data mode identifier for I2C transactions
+#define OLED_I2C_ADDR 0x3C // Default I2C address for SSD1306 OLED
+#define OLED_CMD 0x00      // Command mode identifier for I2C transactions
+#define OLED_DATA 0x40     // Data mode identifier for I2C transactions
 
 /*
  * External Declarations:
@@ -42,10 +42,10 @@
  * - i2c_sem: Semaphore for synchronizing access to the I2C bus
  * - ssd1306xled_font8x16: Font array (8x16 pixels) for character rendering
  */
-extern XIic              IicInstance;             // I2C instance for OLED communication
-extern SemaphoreHandle_t oled_sem;                // Semaphore for OLED access control
-extern SemaphoreHandle_t i2c_sem;                 // Semaphore for I2C bus access control
-extern const uint8_t     ssd1306xled_font8x16[];  // 8x16 font data for text display
+extern XIic              IicInstance;            // I2C instance for OLED communication
+extern SemaphoreHandle_t oled_sem;               // Semaphore for OLED access control
+extern SemaphoreHandle_t i2c_sem;                // Semaphore for I2C bus access control
+extern const uint8_t     ssd1306xled_font8x16[]; // 8x16 font data for text display
 
 /*
  * Function: lcd_init
@@ -56,12 +56,12 @@ extern const uint8_t     ssd1306xled_font8x16[];  // 8x16 font data for text dis
  *   - i2c: Pointer to the XIic instance for I2C communication
  * Returns: int (XST_SUCCESS on success, XST_FAILURE on failure)
  */
-int lcd_init ( XIic* i2c );
+int lcd_init(XIic* i2c);
 
-void lcd_display_string_via_queue ( XIic*        i2c,
-                                    const char*  str,
-                                    uint8_t      page,
-                                    xQueueHandle reply_queue );
+void lcd_display_string_via_queue(XIic*        i2c,
+                                  const char*  str,
+                                  uint8_t      page,
+                                  xQueueHandle reply_queue);
 
 /*
  * Function: LCD_Task
@@ -72,7 +72,7 @@ void lcd_display_string_via_queue ( XIic*        i2c,
  *   - pvParameters: Pointer to SensorData_t structure containing sensor readings
  * Returns: None (infinite loop)
  */
-void LCD_Task ( void* pvParameters );
+void LCD_Task(void* pvParameters);
 
 /*
  * Function: clear_lcd
@@ -82,6 +82,6 @@ void LCD_Task ( void* pvParameters );
  *   - i2c: Pointer to the XIic instance for I2C communication
  * Returns: None
  */
-void clear_lcd ( XIic* i2c );
+void clear_lcd(XIic* i2c);
 
 #endif /* LCD_H */
