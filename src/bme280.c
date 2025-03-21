@@ -123,7 +123,7 @@ int bme_read_calibration_data(XIic* iic, struct bme280_calib_data* calib)
     calib->dig_h5 = (int16_t) ((int8_t) buffer[5] * 16) | (buffer[4] >> 4);
     calib->dig_h6 = (int8_t) buffer[6];
 
-    return 0; // Return success (no error handling implemented)
+    return 0;
 }
 
 /**
