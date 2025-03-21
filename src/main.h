@@ -12,7 +12,7 @@
  * Course:  ECE 544 - Embedded Systems Design, Winter 2025
  * Project: Final Project - Environmental Control System
  * Date:    March 20, 2025
- * Author:  [Your Name/Group Name, if applicable]
+ *
  *
  * Dependencies:
  *   - Standard C: stdint.h, stdlib.h
